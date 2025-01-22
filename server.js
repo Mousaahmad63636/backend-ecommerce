@@ -1,5 +1,3 @@
-// backend/server.js
-
 // Import dependencies
 const express = require('express');
 const mongoose = require('mongoose');
@@ -14,11 +12,14 @@ const Counter = require('./models/Counter');
 const timerRoutes = require('./routes/timer');
 require('dotenv').config();
 
+// Initialize Express app
+const app = express();
+
+// CORS Configuration
 const corsOptions = {
     origin: [
         'https://frontend-ecommerce-dun.vercel.app',
         'https://frontend-ecommerce-8hgd7ct28-mousaahmad63636s-projects.vercel.app',
-        // Add any other domains you need
         process.env.NODE_ENV === 'development' ? 'http://localhost:3000' : null
     ].filter(Boolean),
     credentials: true,
@@ -26,44 +27,8 @@ const corsOptions = {
     allowedHeaders: ['Content-Type', 'Authorization']
 };
 
+// Basic Middleware Setup
 app.use(cors(corsOptions));
-  
-  // Update static file serving
-  app.use('/uploads', cors(), express.static(path.join(__dirname, 'uploads'), {
-    setHeaders: (res) => {
-      res.set({
-        'Cross-Origin-Resource-Policy': 'cross-origin',
-        'Access-Control-Allow-Origin': '*'
-      });
-    }
-  }));
-  app.get('/health', (req, res) => {
-    res.json({
-      status: 'healthy',
-      timestamp: new Date(),
-      uptime: process.uptime()
-    });
-  });
-  // Add a basic health check endpoint
-  app.get('/health', (req, res) => {
-    res.json({
-      status: 'healthy',
-      timestamp: new Date(),
-      uptime: process.uptime()
-    });
-  });
-
-// Initialize Express app
-const app = express();
-app.use(cors(corsOptions));
-// Create required directories
-const uploadDirs = ['uploads', 'uploads/profile-images', 'uploads/products'];
-uploadDirs.forEach(dir => {
-    const dirPath = path.join(__dirname, dir);
-    !fs.existsSync(dirPath) && fs.mkdirSync(dirPath, { recursive: true });
-});
-
-// Basic Middleware
 app.use(helmet({
     contentSecurityPolicy: false,
     crossOriginEmbedderPolicy: false,
@@ -74,6 +39,12 @@ app.use(express.urlencoded({ extended: true, limit: '50mb' }));
 app.use(cookieParser());
 app.use(compression());
 
+// Create required directories
+const uploadDirs = ['uploads', 'uploads/profile-images', 'uploads/products'];
+uploadDirs.forEach(dir => {
+    const dirPath = path.join(__dirname, dir);
+    !fs.existsSync(dirPath) && fs.mkdirSync(dirPath, { recursive: true });
+});
 
 // Logging Setup
 const logsDir = path.join(__dirname, 'logs');
@@ -87,7 +58,7 @@ if (process.env.NODE_ENV === 'development') {
     }));
 }
 
-// Static Files
+// Static Files Setup
 app.use('/uploads', cors(), express.static(path.join(__dirname, 'uploads'), {
     setHeaders: (res) => {
         res.set({
@@ -97,25 +68,7 @@ app.use('/uploads', cors(), express.static(path.join(__dirname, 'uploads'), {
     }
 }));
 
-// API Routes
-app.use('/api/timer', timerRoutes);
-app.use('/api/settings', require('./routes/settings'));
-app.use('/api/promo-codes', require('./routes/promoCodes'));
-
-// Register other routes
-const routes = {
-    users: require('./routes/users'),
-    products: require('./routes/products'),
-    orders: require('./routes/orders'),
-    settings: require('./routes/settings'),
-    'promo-codes': require('./routes/promoCodes')
-};
-
-Object.entries(routes).forEach(([key, router]) => {
-    app.use(`/api/${key}`, router);
-});
-
-// Health Check Route
+// Health Check Endpoint
 app.get('/health', (req, res) => {
     res.json({
         status: 'healthy',
@@ -125,7 +78,21 @@ app.get('/health', (req, res) => {
     });
 });
 
-// Database Connection
+// API Routes Registration
+const routes = {
+    users: require('./routes/users'),
+    products: require('./routes/products'),
+    orders: require('./routes/orders'),
+    settings: require('./routes/settings'),
+    'promo-codes': require('./routes/promoCodes')
+};
+
+app.use('/api/timer', timerRoutes);
+Object.entries(routes).forEach(([key, router]) => {
+    app.use(`/api/${key}`, router);
+});
+
+// Database Connection Setup
 async function initializeCounter() {
     try {
         const counter = await Counter.findById('orderId');
