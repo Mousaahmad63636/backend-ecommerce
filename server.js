@@ -15,6 +15,7 @@ require('dotenv').config();
 // Initialize Express app
 const app = express();
 
+// CORS Configuration
 const corsOptions = {
     origin: [
         'https://frontend-ecommerce-dun.vercel.app',
@@ -27,11 +28,6 @@ const corsOptions = {
     allowedHeaders: ['Content-Type', 'Authorization', 'x-access-token', 'Origin', 'Accept'],
     exposedHeaders: ['Access-Control-Allow-Origin']
 };
-// API Request Logging
-app.use((req, res, next) => {
-    console.log(`${new Date().toISOString()} - ${req.method} ${req.originalUrl}`);
-    next();
-});
 
 // Basic Middleware Setup
 app.use(cors(corsOptions));
@@ -45,11 +41,18 @@ app.use(express.urlencoded({ extended: true, limit: '50mb' }));
 app.use(cookieParser());
 app.use(compression());
 
+// API Request Logging
+app.use((req, res, next) => {
+    console.log(`${new Date().toISOString()} - ${req.method} ${req.originalUrl}`);
+    next();
+});
+
 // Create required directories
 const directories = [
     '/backend/uploads',
     '/backend/uploads/profile-images',
-    '/backend/uploads/products'
+    '/backend/uploads/products',
+    path.join(__dirname, 'logs')
 ];
 
 directories.forEach(dir => {
@@ -62,11 +65,12 @@ directories.forEach(dir => {
 if (process.env.NODE_ENV === 'development') {
     app.use(morgan('dev'));
 } else {
-    app.use(morgan('combined', {
-        stream: fs.createWriteStream(path.join(__dirname, 'logs', 'access.log'), { flags: 'a' })
-    }));
+    const logFile = path.join(__dirname, 'logs', 'access.log');
+    const logStream = fs.createWriteStream(logFile, { flags: 'a' });
+    app.use(morgan('combined', { stream: logStream }));
 }
 
+// Static Files Setup
 app.use('/uploads', cors(), express.static('/backend/uploads', {
     setHeaders: (res) => {
         res.set({
@@ -78,8 +82,8 @@ app.use('/uploads', cors(), express.static('/backend/uploads', {
     }
 }));
 
-// Add products static path
 app.use('/uploads/products', express.static('/backend/uploads/products'));
+
 // Root Route
 app.get('/', (req, res) => {
     res.json({
@@ -111,7 +115,6 @@ const routes = {
     'promo-codes': require('./routes/promoCodes')
 };
 
-// Register API routes with logging
 app.use('/api/timer', timerRoutes);
 app.use('/api/settings', require('./routes/settings'));
 app.use('/api/promo-codes', require('./routes/promoCodes'));
@@ -128,26 +131,30 @@ async function initializeCounter() {
         const counter = await Counter.findById('orderId');
         if (!counter) {
             await new Counter({ _id: 'orderId', seq: 0 }).save();
-            console.log('Order counter initialized');
+            console.log('Counter initialized');
         }
     } catch (error) {
         console.error('Counter initialization error:', error);
-        throw error;
     }
 }
 
-const connectDB = async () => {
+async function connectDB() {
     try {
-        await mongoose.connect(process.env.MONGODB_URI);
-        await initializeCounter();
-        console.log('MongoDB connected and counter initialized');
-    } catch (err) {
-        console.error('MongoDB connection error:', err);
-        setTimeout(connectDB, 5000);
-    }
-};
+        const options = {
+            useNewUrlParser: true,
+            useUnifiedTopology: true,
+            serverSelectionTimeoutMS: 5000,
+            socketTimeoutMS: 45000,
+        };
 
-connectDB().catch(console.error);
+        await mongoose.connect(process.env.MONGODB_URI, options);
+        console.log('MongoDB connected successfully');
+        await initializeCounter();
+    } catch (error) {
+        console.error('MongoDB connection error:', error);
+        process.exit(1);
+    }
+}
 
 // 404 Error Handler
 app.use((req, res, next) => {
@@ -177,7 +184,7 @@ app.use((err, req, res, next) => {
 });
 
 // Graceful Shutdown Handler
-const gracefulShutdown = async () => {
+const gracefulShutdown = async (server) => {
     console.log('Starting graceful shutdown...');
     try {
         await new Promise((resolve, reject) => {
@@ -192,24 +199,35 @@ const gracefulShutdown = async () => {
     }
 };
 
-// Process Event Handlers
-['SIGTERM', 'SIGINT'].forEach(signal => {
-    process.on(signal, gracefulShutdown);
-});
-
-process.on('unhandledRejection', (reason, promise) => {
-    console.error('Unhandled Rejection:', promise, 'reason:', reason);
-});
-
-process.on('uncaughtException', (error) => {
-    console.error('Uncaught Exception:', error);
-    gracefulShutdown();
-});
-
 // Server Initialization
-const PORT = process.env.PORT || 5000;
-const server = app.listen(PORT, () => {
-    console.log(`Server running on port ${PORT} in ${process.env.NODE_ENV || 'development'} mode`);
-});
+const startServer = async () => {
+    try {
+        await connectDB();
+        const PORT = process.env.PORT || 5000;
+        const server = app.listen(PORT, () => {
+            console.log(`Server running on port ${PORT} in ${process.env.NODE_ENV || 'development'} mode`);
+        });
+
+        // Process Event Handlers
+        ['SIGTERM', 'SIGINT'].forEach(signal => {
+            process.on(signal, () => gracefulShutdown(server));
+        });
+
+        process.on('unhandledRejection', (reason, promise) => {
+            console.error('Unhandled Rejection:', promise, 'reason:', reason);
+        });
+
+        process.on('uncaughtException', (error) => {
+            console.error('Uncaught Exception:', error);
+            gracefulShutdown(server);
+        });
+
+    } catch (error) {
+        console.error('Failed to start server:', error);
+        process.exit(1);
+    }
+};
+
+startServer();
 
 module.exports = app;
