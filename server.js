@@ -15,18 +15,18 @@ require('dotenv').config();
 // Initialize Express app
 const app = express();
 
-// CORS Configuration
 const corsOptions = {
     origin: [
         'https://frontend-ecommerce-dun.vercel.app',
         'https://frontend-ecommerce-8hgd7ct28-mousaahmad63636s-projects.vercel.app',
+        'https://spotlylb.com',
         process.env.NODE_ENV === 'development' ? 'http://localhost:3000' : null
     ].filter(Boolean),
     credentials: true,
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-    allowedHeaders: ['Content-Type', 'Authorization', 'x-access-token', 'Origin', 'Accept']
+    allowedHeaders: ['Content-Type', 'Authorization', 'x-access-token', 'Origin', 'Accept'],
+    exposedHeaders: ['Access-Control-Allow-Origin']
 };
-
 // API Request Logging
 app.use((req, res, next) => {
     console.log(`${new Date().toISOString()} - ${req.method} ${req.originalUrl}`);
@@ -61,13 +61,13 @@ if (process.env.NODE_ENV === 'development') {
     }));
 }
 
-// Static Files Setup with CORS
 app.use('/uploads', cors(), express.static(path.join(__dirname, 'uploads'), {
     setHeaders: (res) => {
         res.set({
             'Cross-Origin-Resource-Policy': 'cross-origin',
             'Access-Control-Allow-Origin': '*',
             'Access-Control-Allow-Methods': 'GET, HEAD, OPTIONS',
+            'Access-Control-Allow-Headers': 'Origin, X-Requested-With, Content-Type, Accept',
             'Cache-Control': 'public, max-age=31536000'
         });
     }
