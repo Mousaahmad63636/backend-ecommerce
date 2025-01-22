@@ -46,10 +46,16 @@ app.use(cookieParser());
 app.use(compression());
 
 // Create required directories
-const directories = ['uploads', 'uploads/profile-images', 'uploads/products', 'logs'];
+const directories = [
+    '/backend/uploads', 
+    '/backend/uploads/profile-images', 
+    '/backend/uploads/products'
+];
+
 directories.forEach(dir => {
-    const dirPath = path.join(__dirname, dir);
-    !fs.existsSync(dirPath) && fs.mkdirSync(dirPath, { recursive: true });
+    if (!fs.existsSync(dir)) {
+        fs.mkdirSync(dir, { recursive: true });
+    }
 });
 
 // Logging Setup
@@ -61,17 +67,17 @@ if (process.env.NODE_ENV === 'development') {
     }));
 }
 
-app.use('/uploads', cors(), express.static(path.join(__dirname, 'uploads'), {
+// Update static files path
+app.use('/uploads', cors(), express.static('/backend/uploads'), {
     setHeaders: (res) => {
         res.set({
             'Cross-Origin-Resource-Policy': 'cross-origin',
             'Access-Control-Allow-Origin': '*',
             'Access-Control-Allow-Methods': 'GET, HEAD, OPTIONS',
-            'Access-Control-Allow-Headers': 'Origin, X-Requested-With, Content-Type, Accept',
             'Cache-Control': 'public, max-age=31536000'
         });
     }
-}));
+});
 
 // Root Route
 app.get('/', (req, res) => {

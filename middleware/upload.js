@@ -3,7 +3,7 @@ const path = require('path');
 
 const storage = multer.diskStorage({
     destination: function(req, file, cb) {
-        cb(null, process.env.DISK_MOUNT_PATH || path.join(__dirname, '../uploads')); 
+        cb(null, '/backend/uploads/products');
     },
     filename: function(req, file, cb) {
         const uniqueSuffix = Date.now() + '-' + Math.random().toString(36).substr(2, 9);
