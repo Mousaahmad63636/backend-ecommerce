@@ -47,8 +47,8 @@ app.use(compression());
 
 // Create required directories
 const directories = [
-    '/backend/uploads', 
-    '/backend/uploads/profile-images', 
+    '/backend/uploads',
+    '/backend/uploads/profile-images',
     '/backend/uploads/products'
 ];
 
@@ -67,8 +67,7 @@ if (process.env.NODE_ENV === 'development') {
     }));
 }
 
-// Update static files path
-app.use('/uploads', cors(), express.static('/backend/uploads'), {
+app.use('/uploads', cors(), express.static('/backend/uploads', {
     setHeaders: (res) => {
         res.set({
             'Cross-Origin-Resource-Policy': 'cross-origin',
@@ -77,7 +76,9 @@ app.use('/uploads', cors(), express.static('/backend/uploads'), {
             'Cache-Control': 'public, max-age=31536000'
         });
     }
-});
+}));
+
+// Add products static path
 app.use('/uploads/products', express.static('/backend/uploads/products'));
 // Root Route
 app.get('/', (req, res) => {
