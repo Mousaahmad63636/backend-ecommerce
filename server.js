@@ -78,7 +78,7 @@ app.use('/uploads', cors(), express.static('/backend/uploads'), {
         });
     }
 });
-
+app.use('/uploads/products', express.static('/backend/uploads/products'));
 // Root Route
 app.get('/', (req, res) => {
     res.json({
