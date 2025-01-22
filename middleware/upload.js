@@ -1,10 +1,9 @@
-// backend/middleware/upload.js
 const multer = require('multer');
 const path = require('path');
 
 const storage = multer.diskStorage({
     destination: function(req, file, cb) {
-        cb(null, path.join(__dirname, '../uploads/products'));
+        cb(null, process.env.DISK_MOUNT_PATH || path.join(__dirname, '../uploads')); 
     },
     filename: function(req, file, cb) {
         const uniqueSuffix = Date.now() + '-' + Math.random().toString(36).substr(2, 9);
@@ -23,8 +22,8 @@ const fileFilter = (req, file, cb) => {
 const upload = multer({
     storage: storage,
     limits: {
-        fileSize: 5 * 1024 * 1024, // 5MB limit
-        files: 5 // Maximum 5 files
+        fileSize: 5 * 1024 * 1024,
+        files: 5
     },
     fileFilter: fileFilter
 });
