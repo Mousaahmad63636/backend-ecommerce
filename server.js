@@ -14,14 +14,44 @@ const Counter = require('./models/Counter');
 const timerRoutes = require('./routes/timer');
 require('dotenv').config();
 
-// CORS Configuration
 const corsOptions = {
-    origin: 'http://localhost:3000',
+    origin: [
+        'https://frontend-ecommerce-dun.vercel.app',
+        'https://frontend-ecommerce-8hgd7ct28-mousaahmad63636s-projects.vercel.app',
+        // Add any other domains you need
+        process.env.NODE_ENV === 'development' ? 'http://localhost:3000' : null
+    ].filter(Boolean),
     credentials: true,
-    methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS', 'PATCH'],
-    allowedHeaders: ['Content-Type', 'Authorization', 'x-access-token', 'Origin', 'Accept'],
-    exposedHeaders: ['Content-Range', 'X-Content-Range']
+    methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+    allowedHeaders: ['Content-Type', 'Authorization']
 };
+
+app.use(cors(corsOptions));
+  
+  // Update static file serving
+  app.use('/uploads', cors(), express.static(path.join(__dirname, 'uploads'), {
+    setHeaders: (res) => {
+      res.set({
+        'Cross-Origin-Resource-Policy': 'cross-origin',
+        'Access-Control-Allow-Origin': '*'
+      });
+    }
+  }));
+  app.get('/health', (req, res) => {
+    res.json({
+      status: 'healthy',
+      timestamp: new Date(),
+      uptime: process.uptime()
+    });
+  });
+  // Add a basic health check endpoint
+  app.get('/health', (req, res) => {
+    res.json({
+      status: 'healthy',
+      timestamp: new Date(),
+      uptime: process.uptime()
+    });
+  });
 
 // Initialize Express app
 const app = express();
