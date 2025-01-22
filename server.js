@@ -24,8 +24,14 @@ const corsOptions = {
     ].filter(Boolean),
     credentials: true,
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-    allowedHeaders: ['Content-Type', 'Authorization']
+    allowedHeaders: ['Content-Type', 'Authorization', 'x-access-token', 'Origin', 'Accept']
 };
+
+// API Request Logging
+app.use((req, res, next) => {
+    console.log(`${new Date().toISOString()} - ${req.method} ${req.originalUrl}`);
+    next();
+});
 
 // Basic Middleware Setup
 app.use(cors(corsOptions));
@@ -40,33 +46,43 @@ app.use(cookieParser());
 app.use(compression());
 
 // Create required directories
-const uploadDirs = ['uploads', 'uploads/profile-images', 'uploads/products'];
-uploadDirs.forEach(dir => {
+const directories = ['uploads', 'uploads/profile-images', 'uploads/products', 'logs'];
+directories.forEach(dir => {
     const dirPath = path.join(__dirname, dir);
     !fs.existsSync(dirPath) && fs.mkdirSync(dirPath, { recursive: true });
 });
 
 // Logging Setup
-const logsDir = path.join(__dirname, 'logs');
-!fs.existsSync(logsDir) && fs.mkdirSync(logsDir, { recursive: true });
-
 if (process.env.NODE_ENV === 'development') {
     app.use(morgan('dev'));
 } else {
     app.use(morgan('combined', {
-        stream: fs.createWriteStream(path.join(logsDir, 'access.log'), { flags: 'a' })
+        stream: fs.createWriteStream(path.join(__dirname, 'logs', 'access.log'), { flags: 'a' })
     }));
 }
 
-// Static Files Setup
+// Static Files Setup with CORS
 app.use('/uploads', cors(), express.static(path.join(__dirname, 'uploads'), {
     setHeaders: (res) => {
         res.set({
             'Cross-Origin-Resource-Policy': 'cross-origin',
-            'Access-Control-Allow-Origin': '*'
+            'Access-Control-Allow-Origin': '*',
+            'Access-Control-Allow-Methods': 'GET, HEAD, OPTIONS',
+            'Cache-Control': 'public, max-age=31536000'
         });
     }
 }));
+
+// Root Route
+app.get('/', (req, res) => {
+    res.json({
+        message: 'API is running',
+        version: '1.0.0',
+        status: 'healthy',
+        timestamp: new Date(),
+        endpoints: ['/api/products', '/api/users', '/api/orders', '/api/settings', '/api/promo-codes']
+    });
+});
 
 // Health Check Endpoint
 app.get('/health', (req, res) => {
@@ -74,7 +90,8 @@ app.get('/health', (req, res) => {
         status: 'healthy',
         timestamp: new Date(),
         uptime: process.uptime(),
-        environment: process.env.NODE_ENV || 'development'
+        environment: process.env.NODE_ENV || 'development',
+        mongodb: mongoose.connection.readyState === 1 ? 'connected' : 'disconnected'
     });
 });
 
@@ -87,9 +104,15 @@ const routes = {
     'promo-codes': require('./routes/promoCodes')
 };
 
+// Register API routes with logging
 app.use('/api/timer', timerRoutes);
+app.use('/api/settings', require('./routes/settings'));
+app.use('/api/promo-codes', require('./routes/promoCodes'));
+
 Object.entries(routes).forEach(([key, router]) => {
-    app.use(`/api/${key}`, router);
+    const path = `/api/${key}`;
+    app.use(path, router);
+    console.log(`Route registered: ${path}`);
 });
 
 // Database Connection Setup
@@ -108,10 +131,7 @@ async function initializeCounter() {
 
 const connectDB = async () => {
     try {
-        await mongoose.connect(process.env.MONGODB_URI, {
-            useNewUrlParser: true,
-            useUnifiedTopology: true
-        });
+        await mongoose.connect(process.env.MONGODB_URI);
         await initializeCounter();
         console.log('MongoDB connected and counter initialized');
     } catch (err) {
@@ -122,24 +142,31 @@ const connectDB = async () => {
 
 connectDB().catch(console.error);
 
-// Error Handling Middleware
+// 404 Error Handler
 app.use((req, res, next) => {
-    const error = new Error(`Not Found - ${req.originalUrl}`);
-    error.status = 404;
-    next(error);
+    console.log(`404 - Not Found - ${req.method} ${req.originalUrl}`);
+    res.status(404).json({
+        status: 'error',
+        message: `Not Found - ${req.originalUrl}`,
+        availableEndpoints: [
+            '/api/products',
+            '/api/users',
+            '/api/orders',
+            '/api/settings',
+            '/api/promo-codes',
+            '/api/timer'
+        ]
+    });
 });
 
+// Global Error Handler
 app.use((err, req, res, next) => {
-    console.error(err.stack);
-    const error = {
-        success: false,
+    console.error('Error:', err.stack);
+    res.status(err.status || 500).json({
+        status: 'error',
         message: err.message || 'Internal server error',
-        status: err.status || 500
-    };
-    if (process.env.NODE_ENV === 'development') {
-        error.stack = err.stack;
-    }
-    res.status(error.status).json(error);
+        ...(process.env.NODE_ENV === 'development' && { stack: err.stack })
+    });
 });
 
 // Graceful Shutdown Handler
