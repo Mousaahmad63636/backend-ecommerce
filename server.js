@@ -21,7 +21,6 @@ const corsOptions = {
         'https://frontend-ecommerce-dun.vercel.app',
         'https://frontend-ecommerce-8hgd7ct28-mousaahmad63636s-projects.vercel.app',
         'https://spotlylb.com',
-        'https://www.spotlylb.com',
         process.env.NODE_ENV === 'development' ? 'http://localhost:3000' : null
     ].filter(Boolean),
     credentials: true,
@@ -85,6 +84,28 @@ app.use('/uploads', cors(), express.static('/backend/uploads', {
 
 app.use('/uploads/products', express.static('/backend/uploads/products'));
 
+// Root Route
+app.get('/', (req, res) => {
+    res.json({
+        message: 'API is running',
+        version: '1.0.0',
+        status: 'healthy',
+        timestamp: new Date(),
+        endpoints: ['/api/products', '/api/users', '/api/orders', '/api/settings', '/api/promo-codes']
+    });
+});
+
+// Health Check Endpoint
+app.get('/health', (req, res) => {
+    res.json({
+        status: 'healthy',
+        timestamp: new Date(),
+        uptime: process.uptime(),
+        environment: process.env.NODE_ENV || 'development',
+        mongodb: mongoose.connection.readyState === 1 ? 'connected' : 'disconnected'
+    });
+});
+
 // API Routes Registration
 const routes = {
     users: require('./routes/users'),
@@ -94,7 +115,6 @@ const routes = {
     'promo-codes': require('./routes/promoCodes')
 };
 
-// Register API routes
 app.use('/api/timer', timerRoutes);
 app.use('/api/settings', require('./routes/settings'));
 app.use('/api/promo-codes', require('./routes/promoCodes'));
@@ -103,17 +123,6 @@ Object.entries(routes).forEach(([key, router]) => {
     const path = `/api/${key}`;
     app.use(path, router);
     console.log(`Route registered: ${path}`);
-});
-
-// API Routes
-app.get('/api/health', (req, res) => {
-    res.json({
-        status: 'healthy',
-        timestamp: new Date(),
-        uptime: process.uptime(),
-        environment: process.env.NODE_ENV || 'development',
-        mongodb: mongoose.connection.readyState === 1 ? 'connected' : 'disconnected'
-    });
 });
 
 // Database Connection Setup
@@ -147,12 +156,12 @@ async function connectDB() {
     }
 }
 
-// API error handler for API routes
-app.use('/api/*', (req, res) => {
-    console.log(`API 404 - Not Found - ${req.method} ${req.originalUrl}`);
+// 404 Error Handler
+app.use((req, res, next) => {
+    console.log(`404 - Not Found - ${req.method} ${req.originalUrl}`);
     res.status(404).json({
         status: 'error',
-        message: 'API endpoint not found',
+        message: `Not Found - ${req.originalUrl}`,
         availableEndpoints: [
             '/api/products',
             '/api/users',
@@ -162,34 +171,6 @@ app.use('/api/*', (req, res) => {
             '/api/timer'
         ]
     });
-});
-
-// Serve static files and handle client-side routing in production
-if (process.env.NODE_ENV === 'production') {
-    // Serve static files from the React app
-    app.use(express.static(path.join(__dirname, '../build')));
-
-    // Handle React routing
-    app.get('*', (req, res) => {
-        res.sendFile(path.join(__dirname, '../build', 'index.html'));
-    });
-} else {
-    // Development 404 handler
-    app.use('*', (req, res) => {
-        res.status(404).json({
-            status: 'error',
-            message: 'Route not found',
-            environment: 'development'
-        });
-    });
-}
-
-// Error handler for static files
-app.use((err, req, res, next) => {
-    if (err.code === 'ENOENT') {
-        return res.status(404).sendFile(path.join(__dirname, '../build', 'index.html'));
-    }
-    next(err);
 });
 
 // Global Error Handler
