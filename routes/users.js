@@ -66,10 +66,11 @@ router.post('/login', async (req, res) => {
           { expiresIn: '7d' }
       );
 
+      // Set both cookie and send token in response
       res.cookie('token', token, {
           httpOnly: true,
           secure: process.env.NODE_ENV === 'production',
-          sameSite: 'strict',
+          sameSite: 'none', // Change this for cross-origin
           maxAge: 7 * 24 * 60 * 60 * 1000
       });
 
@@ -79,7 +80,8 @@ router.post('/login', async (req, res) => {
       res.json({
           message: 'Login successful',
           user: userResponse,
-          redirectTo: '/' // Changed from '/profile' to '/'
+          token: token, // Add this
+          redirectTo: '/'
       });
   } catch (error) {
       res.status(500).json({ message: error.message });
