@@ -18,16 +18,29 @@ const app = express();
 // CORS Configuration
 const corsOptions = {
     origin: [
-        'https://frontend-ecommerce-dun.vercel.app',
-        'https://frontend-ecommerce-8hgd7ct28-mousaahmad63636s-projects.vercel.app',
         'https://spotlylb.com',
         'https://www.spotlylb.com',
+        'https://frontend-ecommerce-dun.vercel.app',
+        'https://frontend-ecommerce-8hgd7ct28-mousaahmad63636s-projects.vercel.app',
         process.env.NODE_ENV === 'development' ? 'http://localhost:3000' : null
     ].filter(Boolean),
     credentials: true,
-    methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-    allowedHeaders: ['Content-Type', 'Authorization', 'x-access-token', 'Origin', 'Accept'],
-    exposedHeaders: ['Set-Cookie', 'Access-Control-Allow-Origin']
+    methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
+    allowedHeaders: [
+        'Content-Type', 
+        'Authorization', 
+        'x-access-token', 
+        'Origin', 
+        'Accept',
+        'X-Requested-With'
+    ],
+    exposedHeaders: [
+        'Set-Cookie', 
+        'Access-Control-Allow-Origin',
+        'Access-Control-Allow-Credentials'
+    ],
+    maxAge: 86400, // 24 hours
+    preflightContinue: false
 };
 
 // Basic Middleware Setup
