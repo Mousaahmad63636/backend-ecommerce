@@ -65,6 +65,7 @@ app.use((req, res, next) => {
 const directories = [
     '/backend/uploads',
     '/backend/uploads/profile-images',
+    '/backend/uploads/hero',
     '/backend/uploads/products',
     path.join(__dirname, 'logs')
 ];

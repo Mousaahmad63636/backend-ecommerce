@@ -1,7 +1,9 @@
+// backend/middleware/upload.js
 const multer = require('multer');
 const path = require('path');
 
-const storage = multer.diskStorage({
+// Product storage configuration
+const productStorage = multer.diskStorage({
     destination: function(req, file, cb) {
         cb(null, '/backend/uploads/products');
     },
@@ -11,7 +13,19 @@ const storage = multer.diskStorage({
     }
 });
 
-const fileFilter = (req, file, cb) => {
+// Hero storage configuration
+const heroStorage = multer.diskStorage({
+    destination: function(req, file, cb) {
+        cb(null, '/backend/uploads/hero');
+    },
+    filename: function(req, file, cb) {
+        const uniqueSuffix = Date.now() + '-' + Math.random().toString(36).substr(2, 9);
+        cb(null, uniqueSuffix + path.extname(file.originalname));
+    }
+});
+
+// File filter for products (images only)
+const productFileFilter = (req, file, cb) => {
     if (file.mimetype.startsWith('image/')) {
         cb(null, true);
     } else {
@@ -19,13 +33,35 @@ const fileFilter = (req, file, cb) => {
     }
 };
 
-const upload = multer({
-    storage: storage,
+// File filter for hero (images and videos)
+const heroFileFilter = (req, file, cb) => {
+    if (file.mimetype.startsWith('image/') || file.mimetype.startsWith('video/')) {
+        cb(null, true);
+    } else {
+        cb(new Error('Please upload an image or video file'), false);
+    }
+};
+
+// Product upload configuration
+const productUpload = multer({
+    storage: productStorage,
     limits: {
         fileSize: 5 * 1024 * 1024,
         files: 5
     },
-    fileFilter: fileFilter
+    fileFilter: productFileFilter
 });
 
-module.exports = upload;
+// Hero upload configuration
+const heroUpload = multer({
+    storage: heroStorage,
+    limits: {
+        fileSize: 10 * 1024 * 1024 // 10MB limit for hero content
+    },
+    fileFilter: heroFileFilter
+});
+
+module.exports = {
+    productUpload,
+    heroUpload
+};
