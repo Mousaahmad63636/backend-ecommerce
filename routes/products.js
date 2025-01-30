@@ -2,7 +2,8 @@
 const router = require('express').Router();
 const Product = require('../models/Product');
 const { auth, adminAuth } = require('../middleware/auth');
-const upload = require('../middleware/upload');
+
+const { productUpload } = require('../middleware/upload');
 const fs = require('fs');
 const path = require('path');
 
@@ -135,7 +136,8 @@ router.get('/:id', async (req, res) => {
 
 // Update product
 // Update the update product route
-router.put('/:id', adminAuth, upload.array('images', 5), async (req, res) => {
+// For update route:
+router.put('/:id', productUpload.array('images', 5), async (req, res) => {
   try {
     const updateData = {
       name: req.body.name,
