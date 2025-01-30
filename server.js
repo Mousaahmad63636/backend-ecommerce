@@ -27,15 +27,15 @@ const corsOptions = {
     credentials: true,
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
     allowedHeaders: [
-        'Content-Type', 
-        'Authorization', 
-        'x-access-token', 
-        'Origin', 
+        'Content-Type',
+        'Authorization',
+        'x-access-token',
+        'Origin',
         'Accept',
         'X-Requested-With'
     ],
     exposedHeaders: [
-        'Set-Cookie', 
+        'Set-Cookie',
         'Access-Control-Allow-Origin',
         'Access-Control-Allow-Credentials'
     ],
@@ -58,6 +58,34 @@ app.use(compression());
 // API Request Logging
 app.use((req, res, next) => {
     console.log(`${new Date().toISOString()} - ${req.method} ${req.originalUrl}`);
+    next();
+});
+app.use('/uploads', cors({
+    origin: '*',
+    methods: ['GET', 'HEAD', 'OPTIONS'],
+    maxAge: 86400,
+}));
+
+app.use('/uploads', express.static(path.join(__dirname, 'uploads'), {
+    setHeaders: (res) => {
+        res.set({
+            'Cross-Origin-Resource-Policy': 'cross-origin',
+            'Access-Control-Allow-Origin': '*',
+            'Access-Control-Allow-Methods': 'GET, HEAD, OPTIONS',
+            'Cache-Control': 'public, max-age=31536000'
+        });
+    }
+}));
+
+// Add specific routes for different upload directories using absolute paths
+app.use('/uploads/hero', express.static(path.join(__dirname, 'uploads/hero')));
+app.use('/uploads/products', express.static(path.join(__dirname, 'uploads/products')));
+app.use('/uploads/profile-images', express.static(path.join(__dirname, 'uploads/profile-images')));
+
+// Add debug logging for file access
+app.use('/uploads', (req, res, next) => {
+    console.log('Accessing file:', req.url);
+    console.log('Full path:', path.join(__dirname, 'uploads', req.url));
     next();
 });
 
@@ -86,7 +114,7 @@ if (process.env.NODE_ENV === 'development') {
 }
 
 // Static Files Setup
-app.use('/uploads', cors(), express.static('/backend/uploads', {
+app.use('/uploads', express.static('/backend/uploads', {
     setHeaders: (res) => {
         res.set({
             'Cross-Origin-Resource-Policy': 'cross-origin',
@@ -97,7 +125,10 @@ app.use('/uploads', cors(), express.static('/backend/uploads', {
     }
 }));
 
+app.use('/uploads/hero', express.static('/backend/uploads/hero'));
 app.use('/uploads/products', express.static('/backend/uploads/products'));
+app.use('/uploads/profile-images', express.static('/backend/uploads/profile-images'));
+
 
 // Root Route
 app.get('/', (req, res) => {
