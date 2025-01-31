@@ -11,7 +11,10 @@ const cookieParser = require('cookie-parser');
 const Counter = require('./models/Counter');
 const timerRoutes = require('./routes/timer');
 require('dotenv').config();
-
+const uploadDir = '/backend/uploads/products';
+if (!fs.existsSync(uploadDir)) {
+    fs.mkdirSync(uploadDir, { recursive: true });
+}
 // Initialize Express app
 const app = express();
 

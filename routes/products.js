@@ -2,8 +2,7 @@
 const router = require('express').Router();
 const Product = require('../models/Product');
 const { auth, adminAuth } = require('../middleware/auth');
-const upload = require('../middleware/upload'); // Add this import
-const { productUpload } = require('../middleware/upload');
+const upload = require('../middleware/upload');
 const fs = require('fs');
 const path = require('path');
 

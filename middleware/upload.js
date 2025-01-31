@@ -1,11 +1,20 @@
-// backend/middleware/upload.js
 const multer = require('multer');
 const path = require('path');
+const fs = require('fs');
+// Helper function to ensure upload directories exist
+const ensureDirectoryExists = (dirPath) => {
+    const fullPath = path.join(__dirname, '..', dirPath);
+    if (!fs.existsSync(fullPath)) {
+        fs.mkdirSync(fullPath, { recursive: true });
+    }
+    return fullPath;
+};
 
 // Product storage configuration
 const productStorage = multer.diskStorage({
     destination: function(req, file, cb) {
-        cb(null, '/backend/uploads/products');
+        const uploadPath = ensureDirectoryExists('uploads/products');
+        cb(null, uploadPath);
     },
     filename: function(req, file, cb) {
         const uniqueSuffix = Date.now() + '-' + Math.random().toString(36).substr(2, 9);
@@ -16,7 +25,8 @@ const productStorage = multer.diskStorage({
 // Hero storage configuration
 const heroStorage = multer.diskStorage({
     destination: function(req, file, cb) {
-        cb(null, '/backend/uploads/hero');
+        const uploadPath = ensureDirectoryExists('uploads/hero');
+        cb(null, uploadPath);
     },
     filename: function(req, file, cb) {
         const uniqueSuffix = Date.now() + '-' + Math.random().toString(36).substr(2, 9);
@@ -46,7 +56,7 @@ const heroFileFilter = (req, file, cb) => {
 const productUpload = multer({
     storage: productStorage,
     limits: {
-        fileSize: 5 * 1024 * 1024,
+        fileSize: 5 * 1024 * 1024, // 5MB limit
         files: 5
     },
     fileFilter: productFileFilter
