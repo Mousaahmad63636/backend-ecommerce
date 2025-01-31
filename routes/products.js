@@ -2,7 +2,7 @@
 const router = require('express').Router();
 const Product = require('../models/Product');
 const { auth, adminAuth } = require('../middleware/auth');
-const upload = require('../middleware/upload');
+const { productUpload } = require('../middleware/upload'); // Change this line
 const fs = require('fs');
 const path = require('path');
 
@@ -17,7 +17,7 @@ router.get('/', async (req, res) => {
   }
 });
 
-router.post('/add', upload.array('images', 5), async (req, res) => {
+router.post('/add', productUpload.array('images', 5), async (req, res) => {
   try {
     if (!req.files || req.files.length === 0) {
       return res.status(400).json({ message: 'At least one image is required' });
@@ -132,7 +132,7 @@ router.get('/:id', async (req, res) => {
   }
 });
 
-router.put('/:id', upload.array('images', 5), async (req, res) => {
+router.put('/:id', productUpload.array('images', 5), async (req, res) => {
   try {
     const updateData = {
       name: req.body.name,
