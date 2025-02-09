@@ -20,13 +20,20 @@ const app = express();
 
 // CORS Configuration
 const corsOptions = {
-    origin: [
-        'https://spotlylb.com',
-        'https://www.spotlylb.com',
-        'https://frontend-ecommerce-dun.vercel.app',
-        'https://frontend-ecommerce-8hgd7ct28-mousaahmad63636s-projects.vercel.app',
-        process.env.NODE_ENV === 'development' ? 'http://localhost:3000' : null
-    ].filter(Boolean),
+    origin: function(origin, callback) {
+        const allowedOrigins = [
+            'https://spotlylb.com',
+            'https://www.spotlylb.com',
+            'http://localhost:3000'
+        ];
+        
+        // Allow requests with no origin (like mobile apps, curl requests)
+        if (!origin || allowedOrigins.indexOf(origin) !== -1) {
+            callback(null, true);
+        } else {
+            callback(new Error('Not allowed by CORS'));
+        }
+    },
     credentials: true,
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
     allowedHeaders: [
@@ -37,13 +44,8 @@ const corsOptions = {
         'Accept',
         'X-Requested-With'
     ],
-    exposedHeaders: [
-        'Set-Cookie',
-        'Access-Control-Allow-Origin',
-        'Access-Control-Allow-Credentials'
-    ],
-    maxAge: 86400, // 24 hours
-    preflightContinue: false
+    exposedHeaders: ['*'],
+    maxAge: 86400
 };
 
 // Basic Middleware Setup
@@ -51,7 +53,9 @@ app.use(cors(corsOptions));
 app.use(helmet({
     contentSecurityPolicy: false,
     crossOriginEmbedderPolicy: false,
-    crossOriginResourcePolicy: { policy: "cross-origin" }
+    crossOriginResourcePolicy: { 
+        policy: "cross-origin" 
+    }
 }));
 app.use(express.json({ limit: '50mb' }));
 app.use(express.urlencoded({ extended: true, limit: '50mb' }));
@@ -69,6 +73,7 @@ app.use('/uploads', cors({
     maxAge: 86400,
 }));
 
+// Static Files Setup
 app.use('/uploads', express.static(path.join(__dirname, 'uploads'), {
     setHeaders: (res) => {
         res.set({
@@ -80,11 +85,10 @@ app.use('/uploads', express.static(path.join(__dirname, 'uploads'), {
     }
 }));
 
-// Add specific routes for different upload directories using absolute paths
+// Add these specific routes for different upload directories
 app.use('/uploads/hero', express.static(path.join(__dirname, 'uploads/hero')));
 app.use('/uploads/products', express.static(path.join(__dirname, 'uploads/products')));
 app.use('/uploads/profile-images', express.static(path.join(__dirname, 'uploads/profile-images')));
-
 // Add debug logging for file access
 app.use('/uploads', (req, res, next) => {
     console.log('Accessing file:', req.url);
