@@ -47,7 +47,7 @@ const corsOptions = {
     exposedHeaders: ['*'],
     maxAge: 86400
 };
-
+app.options('*', cors(corsOptions));
 // Basic Middleware Setup
 app.use(cors(corsOptions));
 app.use(helmet({

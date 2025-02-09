@@ -14,16 +14,12 @@ router.use(cors({
 // Get active timer
 router.get('/', async (req, res) => {
   try {
-    const timer = await Timer.findOne({ 
-      isActive: true,
-      endDate: { $gt: new Date() }
-    });
-    res.json(timer);
+      const timer = await Timer.findOne().sort({ createdAt: -1 });
+      res.status(200).json(timer);
   } catch (error) {
-    res.status(500).json({ message: error.message });
+      res.status(500).json({ message: error.message });
   }
 });
-
 // Create or update timer (admin only)
 router.post('/', adminAuth, async (req, res) => {
   try {

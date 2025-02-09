@@ -19,6 +19,14 @@ router.get('/', adminAuth, async (req, res) => {
         res.status(500).json({ message: error.message });
     }
 });
+router.get('/', async (req, res) => {
+    try {
+        const settings = await Settings.findOne();
+        res.json(settings || {});
+    } catch (error) {
+        res.status(500).json({ message: error.message });
+    }
+});
 
 // Update hero section
 router.put('/hero', adminAuth, heroUpload.single('media'), async (req, res) => {
