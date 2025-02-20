@@ -21,13 +21,16 @@ router.get('/', adminAuth, async (req, res) => {
 });
 router.get('/', async (req, res) => {
     try {
-        const settings = await Settings.findOne();
-        res.json(settings || {});
+        let settings = await Settings.findOne();
+        if (!settings) {
+            settings = await new Settings().save();
+        }
+        res.json(settings);
     } catch (error) {
+        console.error('Error fetching settings:', error);
         res.status(500).json({ message: error.message });
     }
 });
-
 // Update hero section
 router.put('/hero', adminAuth, heroUpload.single('media'), async (req, res) => {
     try {
