@@ -30,7 +30,7 @@ const settingsSchema = new mongoose.Schema({
       type: String,
       default: 'Discover amazing products at great prices'
     }
-  }
+}
 }, {
   timestamps: true
 });
