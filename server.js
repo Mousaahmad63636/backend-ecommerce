@@ -10,25 +10,25 @@ const morgan = require('morgan');
 const cookieParser = require('cookie-parser');
 const Counter = require('./models/Counter');
 const timerRoutes = require('./routes/timer');
+const jwt = require('jsonwebtoken');
+const User = require('./models/User');
 require('dotenv').config();
-const uploadDir = '/backend/uploads/products';
-if (!fs.existsSync(uploadDir)) {
-    fs.mkdirSync(uploadDir, { recursive: true });
-}
+
 // Initialize Express app
 const app = express();
+
+// Define allowed origins
+const allowedOrigins = [
+    'https://spotlylb.com',
+    'https://www.spotlylb.com',
+    'http://localhost:3000'
+];
 
 // CORS Configuration
 const corsOptions = {
     origin: function(origin, callback) {
-        const allowedOrigins = [
-            'https://spotlylb.com',
-            'https://www.spotlylb.com',
-            'http://localhost:3000'
-        ];
-        
-        // Allow requests with no origin (like mobile apps, curl requests)
-        if (!origin || allowedOrigins.indexOf(origin) !== -1) {
+        // Allow requests with no origin (like mobile apps)
+        if (!origin || allowedOrigins.includes(origin)) {
             callback(null, true);
         } else {
             callback(new Error('Not allowed by CORS'));
@@ -47,9 +47,12 @@ const corsOptions = {
     exposedHeaders: ['*'],
     maxAge: 86400
 };
-app.options('*', cors(corsOptions));
-// Basic Middleware Setup
+
+// Apply CORS
 app.use(cors(corsOptions));
+app.options('*', cors(corsOptions));
+
+// Basic Middleware Setup
 app.use(helmet({
     contentSecurityPolicy: false,
     crossOriginEmbedderPolicy: false,
@@ -58,47 +61,41 @@ app.use(helmet({
     },
     crossOriginOpenerPolicy: false
 }));
+
 app.use(express.json({ limit: '50mb' }));
 app.use(express.urlencoded({ extended: true, limit: '50mb' }));
 app.use(cookieParser());
 app.use(compression());
+
+// Authentication Middleware
+app.use(async (req, res, next) => {
+    try {
+        const token = req.cookies.token || req.header('Authorization')?.replace('Bearer ', '');
+        if (token) {
+            const decoded = jwt.verify(token, process.env.JWT_SECRET);
+            req.user = await User.findById(decoded.userId).select('-password');
+        }
+    } catch (error) {
+        console.error('Auth middleware error:', error);
+    }
+    next();
+});
 
 // API Request Logging
 app.use((req, res, next) => {
     console.log(`${new Date().toISOString()} - ${req.method} ${req.originalUrl}`);
     next();
 });
+
+// Configure uploads directory access
 app.use('/uploads', cors({
-    origin: '*',  // Allow all origins for image files
+    origin: '*',
     methods: ['GET', 'HEAD', 'OPTIONS'],
     maxAge: 86400,
-    credentials: false,  // Important for public files
+    credentials: false
 }));
 
-// Static Files Setup
-app.use('/uploads', express.static(path.join(__dirname, 'uploads'), {
-    setHeaders: (res) => {
-        res.set({
-            'Cross-Origin-Resource-Policy': 'cross-origin',
-            'Access-Control-Allow-Origin': '*',
-            'Access-Control-Allow-Methods': 'GET, HEAD, OPTIONS',
-            'Cache-Control': 'public, max-age=31536000',
-            'Access-Control-Allow-Credentials': 'false'  // Add this
-        });
-    }
-}));
-
-// Add these specific routes for different upload directories
-app.use('/uploads/hero', express.static(path.join(__dirname, 'uploads/hero')));
-app.use('/uploads/products', express.static(path.join(__dirname, 'uploads/products')));
-app.use('/uploads/profile-images', express.static(path.join(__dirname, 'uploads/profile-images')));
-// Add debug logging for file access
-app.use('/uploads', (req, res, next) => {
-    console.log('Accessing file:', req.url);
-    console.log('Full path:', path.join(__dirname, 'uploads', req.url));
-    next();
-});
-
+// Create required directories
 const directories = [
     path.join(__dirname, 'uploads'),
     path.join(__dirname, 'uploads/profile-images'),
@@ -106,12 +103,32 @@ const directories = [
     path.join(__dirname, 'uploads/products'),
     path.join(__dirname, 'logs')
 ];
+
 directories.forEach(dir => {
     if (!fs.existsSync(dir)) {
         fs.mkdirSync(dir, { recursive: true });
     }
 });
 
+// Static Files Setup with proper CORS headers
+app.use('/uploads', express.static(path.join(__dirname, 'uploads'), {
+    setHeaders: (res) => {
+        res.set({
+            'Cross-Origin-Resource-Policy': 'cross-origin',
+            'Access-Control-Allow-Origin': '*',
+            'Access-Control-Allow-Methods': 'GET, HEAD, OPTIONS',
+            'Cache-Control': 'public, max-age=31536000',
+            'Access-Control-Allow-Credentials': 'false'
+        });
+    }
+}));
+
+// Debug logging for file access
+app.use('/uploads', (req, res, next) => {
+    console.log('Accessing file:', req.url);
+    console.log('Full path:', path.join(__dirname, 'uploads', req.url));
+    next();
+});
 // Logging Setup
 if (process.env.NODE_ENV === 'development') {
     app.use(morgan('dev'));
@@ -120,23 +137,6 @@ if (process.env.NODE_ENV === 'development') {
     const logStream = fs.createWriteStream(logFile, { flags: 'a' });
     app.use(morgan('combined', { stream: logStream }));
 }
-
-// Static Files Setup
-app.use('/uploads', express.static('/backend/uploads', {
-    setHeaders: (res) => {
-        res.set({
-            'Cross-Origin-Resource-Policy': 'cross-origin',
-            'Access-Control-Allow-Origin': '*',
-            'Access-Control-Allow-Methods': 'GET, HEAD, OPTIONS',
-            'Cache-Control': 'public, max-age=31536000'
-        });
-    }
-}));
-
-//app.use('/uploads/hero', express.static('/backend/uploads/hero'));
-//app.use('/uploads/products', express.static('/backend/uploads/products'));
-//app.use('/uploads/profile-images', express.static('/backend/uploads/profile-images'));
-
 
 // Root Route
 app.get('/', (req, res) => {
@@ -169,6 +169,7 @@ const routes = {
     'promo-codes': require('./routes/promoCodes')
 };
 
+// Register API routes
 app.use('/api/timer', timerRoutes);
 app.use('/api/settings', require('./routes/settings'));
 app.use('/api/promo-codes', require('./routes/promoCodes'));
