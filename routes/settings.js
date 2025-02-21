@@ -21,13 +21,15 @@ router.get('/', adminAuth, async (req, res) => {
 });
 router.get('/', async (req, res) => {
     try {
+        console.log('Fetching settings...');
         let settings = await Settings.findOne();
+        console.log('Found settings:', settings);
         if (!settings) {
             settings = await new Settings().save();
         }
         res.json(settings);
     } catch (error) {
-        console.error('Error fetching settings:', error);
+        console.error('Settings fetch error:', error);
         res.status(500).json({ message: error.message });
     }
 });

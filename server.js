@@ -96,15 +96,13 @@ app.use('/uploads', (req, res, next) => {
     next();
 });
 
-// Create required directories
 const directories = [
-    '/backend/uploads',
-    '/backend/uploads/profile-images',
-    '/backend/uploads/hero',
-    '/backend/uploads/products',
+    path.join(__dirname, 'uploads'),
+    path.join(__dirname, 'uploads/profile-images'),
+    path.join(__dirname, 'uploads/hero'),
+    path.join(__dirname, 'uploads/products'),
     path.join(__dirname, 'logs')
 ];
-
 directories.forEach(dir => {
     if (!fs.existsSync(dir)) {
         fs.mkdirSync(dir, { recursive: true });
