@@ -1,4 +1,3 @@
-// backend/routes/settings.js
 const router = require('express').Router();
 const Settings = require('../models/Settings');
 const { adminAuth } = require('../middleware/auth');
@@ -6,19 +5,7 @@ const { heroUpload } = require('../middleware/upload');
 const fs = require('fs');
 const path = require('path');
 
-// Get settings
-router.get('/', adminAuth, async (req, res) => {
-    try {
-        let settings = await Settings.findOne();
-        if (!settings) {
-            settings = await new Settings().save();
-        }
-        res.json(settings);
-    } catch (error) {
-        console.error('Error fetching settings:', error);
-        res.status(500).json({ message: error.message });
-    }
-});
+// Public route for getting settings
 router.get('/', async (req, res) => {
     try {
         console.log('Fetching settings...');
@@ -33,7 +20,8 @@ router.get('/', async (req, res) => {
         res.status(500).json({ message: error.message });
     }
 });
-// Update hero section
+
+// Admin route for updating hero section
 router.put('/hero', adminAuth, heroUpload.single('media'), async (req, res) => {
     try {
         const { type, title, subtitle } = req.body;
@@ -50,7 +38,7 @@ router.put('/hero', adminAuth, heroUpload.single('media'), async (req, res) => {
             
             // Delete old file if it exists
             if (currentSettings?.heroSection?.mediaUrl) {
-                const oldFilePath = path.join('/backend', currentSettings.heroSection.mediaUrl);
+                const oldFilePath = path.join(__dirname, '..', currentSettings.heroSection.mediaUrl);
                 if (fs.existsSync(oldFilePath)) {
                     try {
                         fs.unlinkSync(oldFilePath);
@@ -76,7 +64,7 @@ router.put('/hero', adminAuth, heroUpload.single('media'), async (req, res) => {
         
         // Delete uploaded file if there's an error
         if (req.file) {
-            const filePath = path.join('/backend', '/uploads/hero', req.file.filename);
+            const filePath = path.join(__dirname, '..', 'uploads', 'hero', req.file.filename);
             if (fs.existsSync(filePath)) {
                 try {
                     fs.unlinkSync(filePath);
@@ -90,7 +78,7 @@ router.put('/hero', adminAuth, heroUpload.single('media'), async (req, res) => {
     }
 });
 
-// Update general settings
+// Admin route for updating general settings
 router.put('/', adminAuth, async (req, res) => {
     try {
         const settings = await Settings.findOneAndUpdate(
