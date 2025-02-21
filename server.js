@@ -55,7 +55,8 @@ app.use(helmet({
     crossOriginEmbedderPolicy: false,
     crossOriginResourcePolicy: { 
         policy: "cross-origin" 
-    }
+    },
+    crossOriginOpenerPolicy: false
 }));
 app.use(express.json({ limit: '50mb' }));
 app.use(express.urlencoded({ extended: true, limit: '50mb' }));
@@ -68,9 +69,10 @@ app.use((req, res, next) => {
     next();
 });
 app.use('/uploads', cors({
-    origin: '*',
+    origin: '*',  // Allow all origins for image files
     methods: ['GET', 'HEAD', 'OPTIONS'],
     maxAge: 86400,
+    credentials: false,  // Important for public files
 }));
 
 // Static Files Setup
@@ -80,7 +82,8 @@ app.use('/uploads', express.static(path.join(__dirname, 'uploads'), {
             'Cross-Origin-Resource-Policy': 'cross-origin',
             'Access-Control-Allow-Origin': '*',
             'Access-Control-Allow-Methods': 'GET, HEAD, OPTIONS',
-            'Cache-Control': 'public, max-age=31536000'
+            'Cache-Control': 'public, max-age=31536000',
+            'Access-Control-Allow-Credentials': 'false'  // Add this
         });
     }
 }));
@@ -130,9 +133,9 @@ app.use('/uploads', express.static('/backend/uploads', {
     }
 }));
 
-app.use('/uploads/hero', express.static('/backend/uploads/hero'));
-app.use('/uploads/products', express.static('/backend/uploads/products'));
-app.use('/uploads/profile-images', express.static('/backend/uploads/profile-images'));
+//app.use('/uploads/hero', express.static('/backend/uploads/hero'));
+//app.use('/uploads/products', express.static('/backend/uploads/products'));
+//app.use('/uploads/profile-images', express.static('/backend/uploads/profile-images'));
 
 
 // Root Route
