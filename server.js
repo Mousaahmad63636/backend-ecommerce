@@ -31,6 +31,7 @@ const corsOptions = {
         if (!origin || allowedOrigins.indexOf(origin) !== -1) {
             callback(null, true);
         } else {
+            console.log('Blocked by CORS: ', origin);
             callback(new Error('Not allowed by CORS'));
         }
     },
@@ -47,6 +48,11 @@ const corsOptions = {
     exposedHeaders: ['*'],
     maxAge: 86400
 };
+
+// Apply CORS globally
+app.use(cors(corsOptions));
+
+// Handle preflight requests
 app.options('*', cors(corsOptions));
 // Basic Middleware Setup
 app.use(cors(corsOptions));
