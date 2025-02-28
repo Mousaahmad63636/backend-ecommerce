@@ -23,12 +23,8 @@ const productSchema = new mongoose.Schema({
   discountPercentage: {
     type: Number,
     default: 0,
-    min: 0
-  },
-  discountType: {
-    type: String,
-    enum: ['percentage', 'fixed'],
-    default: 'percentage'
+    min: 0,
+    max: 100
   },
   discountEndDate: {
     type: Date
@@ -65,6 +61,18 @@ const productSchema = new mongoose.Schema({
   soldOut: {
     type: Boolean,
     default: false
+  },
+  // Add new rating fields
+  rating: {
+    type: Number,
+    default: 4,
+    min: 1,
+    max: 5
+  },
+  reviewCount: {
+    type: Number,
+    default: 0,
+    min: 0
   }
 }, {
   timestamps: true
