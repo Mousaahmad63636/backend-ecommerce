@@ -37,11 +37,17 @@ const productSchema = new mongoose.Schema({
     type: String,
     required: true
   }],
+  // Keep the original category field for backward compatibility
   category: {
     type: String,
     required: true,
     trim: true
   },
+  // Add new categories array field
+  categories: [{
+    type: String,
+    trim: true
+  }],
   salesCount: {
     type: Number,
     default: 0,
@@ -68,6 +74,22 @@ productSchema.pre('save', function(next) {
     this.discountEndDate = null;
     this.isBlackFridayDeal = false;
   }
+  
+  // Ensure the main category is also in the categories array
+  if (this.category && (!this.categories || !this.categories.includes(this.category))) {
+    if (!this.categories) {
+      this.categories = [];
+    }
+    if (!this.categories.includes(this.category)) {
+      this.categories.push(this.category);
+    }
+  }
+  
+  // If categories exist but no main category, use the first one
+  if (this.categories && this.categories.length > 0 && !this.category) {
+    this.category = this.categories[0];
+  }
+  
   next();
 });
 

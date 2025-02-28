@@ -2,7 +2,7 @@
 const router = require('express').Router();
 const Product = require('../models/Product');
 const { auth, adminAuth } = require('../middleware/auth');
-const { productUpload } = require('../middleware/upload'); // Change this line
+const { productUpload } = require('../middleware/upload');
 const fs = require('fs');
 const path = require('path');
 
@@ -17,41 +17,89 @@ router.get('/', async (req, res) => {
   }
 });
 
+// Add new product with multiple categories
 router.post('/add', productUpload.array('images', 5), async (req, res) => {
   try {
+    console.log('Adding product with data:', req.body);
+    
     if (!req.files || req.files.length === 0) {
       return res.status(400).json({ message: 'At least one image is required' });
     }
 
     const imagesPaths = req.files.map(file => `/uploads/products/${file.filename}`);
+    
+    // Parse the categories array from JSON
+    let categories = [];
+    if (req.body.categories) {
+      try {
+        categories = JSON.parse(req.body.categories);
+        console.log('Parsed categories:', categories);
+        if (!Array.isArray(categories)) {
+          categories = [];
+        }
+      } catch (e) {
+        console.error('Error parsing categories JSON:', e);
+        // Fall back to single category if JSON parsing fails
+        if (req.body.category) {
+          categories = [req.body.category];
+        }
+      }
+    }
+
+    // Ensure backward compatibility - use first category as main if not provided
+    const category = req.body.category || (categories.length > 0 ? categories[0] : '');
+    
+    // If we have a main category but it's not in the categories array, add it
+    if (category && !categories.includes(category)) {
+      categories.push(category);
+    }
 
     const newProduct = new Product({
       name: req.body.name,
       description: req.body.description,
       price: Number(req.body.price),
-      category: req.body.category,
+      category: category,
+      categories: categories,
       images: imagesPaths
     });
 
+    console.log('Saving product with categories:', categories);
     const savedProduct = await newProduct.save();
+    console.log('Saved product:', savedProduct);
     res.status(201).json(savedProduct);
   } catch (error) {
     console.error('Error adding product:', error);
+    // Delete uploaded images if product creation fails
+    if (req.files && req.files.length > 0) {
+      req.files.forEach(file => {
+        const filePath = path.join(__dirname, '..', 'uploads', 'products', file.filename);
+        if (fs.existsSync(filePath)) {
+          try {
+            fs.unlinkSync(filePath);
+          } catch (err) {
+            console.error('Error deleting file:', err);
+          }
+        }
+      });
+    }
     res.status(500).json({ message: error.message });
   }
 });
-// backend/routes/products.js - in the getBestSelling route
+
+
+// Get best selling products
 router.get('/best-selling', async (req, res) => {
   try {
     const products = await Product.find()
       .sort({ salesCount: -1 })
-      .limit(8); // Fetch at least 8 products
+      .limit(8);
     res.json(products);
   } catch (err) {
     console.error('Error fetching best selling products:', err);
     res.status(500).json({ message: err.message });
   }
 });
+
 // Get black friday status
 router.get('/black-friday', async (req, res) => {
   try {
@@ -132,14 +180,51 @@ router.get('/:id', async (req, res) => {
   }
 });
 
+// Update product with multiple categories support
 router.put('/:id', productUpload.array('images', 5), async (req, res) => {
   try {
+    console.log('Update request for product ID:', req.params.id);
+    console.log('Request body:', req.body);
+    
     const updateData = {
       name: req.body.name,
       description: req.body.description,
       price: Number(req.body.price),
       category: req.body.category
     };
+
+    // Handle categories array - ensure proper parsing
+    if (req.body.categories) {
+      try {
+        const categoriesArray = JSON.parse(req.body.categories);
+        console.log('Parsed categories:', categoriesArray);
+        if (Array.isArray(categoriesArray)) {
+          updateData.categories = categoriesArray;
+          
+          // Ensure main category is also in categories array
+          if (updateData.category && !updateData.categories.includes(updateData.category)) {
+            updateData.categories.push(updateData.category);
+          }
+          
+          // If no main category provided but categories exist, use first one
+          if (!updateData.category && updateData.categories.length > 0) {
+            updateData.category = updateData.categories[0];
+          }
+        } else {
+          console.log('Categories not an array after parsing, using fallback');
+          updateData.categories = updateData.category ? [updateData.category] : [];
+        }
+      } catch (err) {
+        console.error('Error parsing categories array:', err);
+        // If parsing fails, fall back to single category
+        updateData.categories = updateData.category ? [updateData.category] : [];
+      }
+    } else if (updateData.category) {
+      // If no categories array but category exists, create a categories array with that category
+      updateData.categories = [updateData.category];
+    }
+    
+    console.log('Final update data:', updateData);
 
     // If new images are uploaded, add them to the update data
     if (req.files && req.files.length > 0) {
@@ -171,8 +256,10 @@ router.put('/:id', productUpload.array('images', 5), async (req, res) => {
       { new: true }
     );
 
+    console.log('Updated product:', updatedProduct);
     res.json(updatedProduct);
   } catch (error) {
+    console.error('Error updating product:', error);
     res.status(400).json({ message: error.message });
   }
 });
@@ -214,7 +301,7 @@ router.delete('/:id/images', adminAuth, async (req, res) => {
   }
 });
 
-
+// Delete product
 router.delete('/:id', async (req, res) => {
   try {
     const product = await Product.findById(req.params.id);
@@ -244,6 +331,7 @@ router.delete('/:id', async (req, res) => {
   }
 });
 
+// Toggle product sold out status
 router.put('/:id/toggle-sold-out', async (req, res) => {
   try {
     const { soldOut } = req.body;
@@ -272,7 +360,7 @@ router.put('/:id/toggle-sold-out', async (req, res) => {
     res.status(400).json({ message: error.message });
   }
 });
-// Apply discount to products
+
 // Apply discount to products
 router.post('/discount', adminAuth, async (req, res) => {
   try {
@@ -286,7 +374,13 @@ router.post('/discount', adminAuth, async (req, res) => {
     if (type === 'specific' && targetId) {
       query = { _id: targetId };
     } else if (type === 'category' && category) {
-      query = { category: category };
+      // Match products that have the category either in the category field or in the categories array
+      query = {
+        $or: [
+          { category: category },
+          { categories: category }
+        ]
+      };
     }
 
     // Find products to update
@@ -329,6 +423,7 @@ router.post('/discount', adminAuth, async (req, res) => {
     });
   }
 });
+
 // Reset product discounts
 router.post('/reset-discount', adminAuth, async (req, res) => {
   try {
