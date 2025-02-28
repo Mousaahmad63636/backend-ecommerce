@@ -368,12 +368,18 @@ router.put('/:id/toggle-sold-out', async (req, res) => {
 });
 
 // Apply discount to products
+// Apply discount to products (excerpt from backend/routes/products.js)
 router.post('/discount', adminAuth, async (req, res) => {
   try {
-    const { type, value, targetId, category, discountEndDate } = req.body;
+    const { type, discountType, value, targetId, category, discountEndDate } = req.body;
 
-    if (!value || value < 0 || value > 100) {
-      return res.status(400).json({ message: 'Invalid discount percentage' });
+    if (!value || value < 0) {
+      return res.status(400).json({ message: 'Invalid discount value' });
+    }
+
+    // For percentage discounts, value must be <= 100
+    if (discountType === 'percentage' && value > 100) {
+      return res.status(400).json({ message: 'Percentage discount cannot exceed 100%' });
     }
 
     let query = {};
@@ -398,7 +404,14 @@ router.post('/discount', adminAuth, async (req, res) => {
     // Update each product with discount and end date
     const updatePromises = products.map(async (product) => {
       const originalPrice = product.originalPrice || product.price;
-      const discountedPrice = originalPrice * (1 - value / 100);
+      let discountedPrice;
+      
+      // Calculate new price based on discount type
+      if (discountType === 'percentage') {
+        discountedPrice = originalPrice * (1 - value / 100);
+      } else { // fixed amount
+        discountedPrice = Math.max(0, originalPrice - value); // Ensure price doesn't go below 0
+      }
 
       return Product.findByIdAndUpdate(
         product._id,
@@ -407,6 +420,7 @@ router.post('/discount', adminAuth, async (req, res) => {
             originalPrice: originalPrice,
             price: discountedPrice,
             discountPercentage: value,
+            discountType: discountType, // Store the discount type
             discountEndDate: discountEndDate // Save the end date
           }
         },
