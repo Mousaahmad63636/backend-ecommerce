@@ -28,7 +28,7 @@ const corsOptions = {
             'http://localhost:3000'
         ];
         
-        // Allow requests with no origin (like mobile apps, curl requests)
+        // Allow requests with no origin (like mobile apps, curl requests, WhatsApp crawler)
         if (!origin || allowedOrigins.indexOf(origin) !== -1) {
             callback(null, true);
         } else {
@@ -44,7 +44,8 @@ const corsOptions = {
         'x-access-token',
         'Origin',
         'Accept',
-        'X-Requested-With'
+        'X-Requested-With',
+        'User-Agent'  // Added to allow WhatsApp crawler to identify itself
     ],
     exposedHeaders: ['*'],
     maxAge: 86400
@@ -55,8 +56,8 @@ app.use(cors(corsOptions));
 
 // Handle preflight requests
 app.options('*', cors(corsOptions));
+
 // Basic Middleware Setup
-app.use(cors(corsOptions));
 app.use(helmet({
     contentSecurityPolicy: false,
     crossOriginEmbedderPolicy: false,
@@ -70,11 +71,19 @@ app.use(express.urlencoded({ extended: true, limit: '50mb' }));
 app.use(cookieParser());
 app.use(compression());
 
-// API Request Logging
+// API Request Logging with User-Agent for crawler debugging
 app.use((req, res, next) => {
-    console.log(`${new Date().toISOString()} - ${req.method} ${req.originalUrl}`);
+    const userAgent = req.get('User-Agent') || 'Unknown';
+    // Log WhatsApp crawler requests separately for debugging
+    if (userAgent.includes('WhatsApp') || userAgent.includes('facebookexternalhit')) {
+        console.log(`${new Date().toISOString()} - CRAWLER - ${req.method} ${req.originalUrl} - ${userAgent}`);
+    } else {
+        console.log(`${new Date().toISOString()} - ${req.method} ${req.originalUrl}`);
+    }
     next();
 });
+
+// Special CORS settings for image directories - crucial for WhatsApp crawler
 app.use('/uploads', cors({
     origin: '*',  // Allow all origins for image files
     methods: ['GET', 'HEAD', 'OPTIONS'],
@@ -82,30 +91,45 @@ app.use('/uploads', cors({
     credentials: false,  // Important for public files
 }));
 
-// Static Files Setup
+// Static Files Setup with proper headers for crawlers
 app.use('/uploads', express.static(DISK_MOUNT_PATH, {
-    setHeaders: (res) => {
+    setHeaders: (res, path) => {
+        // Set appropriate headers for all files
         res.set({
             'Cross-Origin-Resource-Policy': 'cross-origin',
             'Access-Control-Allow-Origin': '*',
             'Access-Control-Allow-Methods': 'GET, HEAD, OPTIONS',
             'Cache-Control': 'public, max-age=31536000'
         });
+        
+        // Set appropriate image headers for different file types
+        if (path.endsWith('.jpg') || path.endsWith('.jpeg')) {
+            res.set('Content-Type', 'image/jpeg');
+        } else if (path.endsWith('.png')) {
+            res.set('Content-Type', 'image/png');
+        } else if (path.endsWith('.gif')) {
+            res.set('Content-Type', 'image/gif');
+        } else if (path.endsWith('.webp')) {
+            res.set('Content-Type', 'image/webp');
+        }
     }
 }));
 
+// Set up specific routes for different upload directories
 app.use('/uploads/hero', express.static(path.join(DISK_MOUNT_PATH, 'hero')));
 app.use('/uploads/products', express.static(path.join(DISK_MOUNT_PATH, 'products')));
 app.use('/uploads/profile-images', express.static(path.join(DISK_MOUNT_PATH, 'profile-images')));
 
-
-// Add debug logging for file access
+// Debug logging for file access - helpful for debugging WhatsApp crawler issues
 app.use('/uploads', (req, res, next) => {
+    const userAgent = req.get('User-Agent') || 'Unknown';
     console.log('Accessing file:', req.url);
     console.log('Full path:', path.join(DISK_MOUNT_PATH, req.url));
+    console.log('User-Agent:', userAgent);
     next();
 });
 
+// Verify disk mount path exists and is writable
 const verifyDiskMount = () => {
     try {
       if (!fs.existsSync(DISK_MOUNT_PATH)) {
@@ -125,18 +149,14 @@ const verifyDiskMount = () => {
     } catch (error) {
       console.error('CRITICAL ERROR: Disk mount verification failed:', error);
     }
-  };
-// Add these specific routes for different upload directories
+};
+
+// Ensure backup specific routes for different upload directories
 app.use('/uploads/hero', express.static(path.join(__dirname, 'uploads/hero')));
 app.use('/uploads/products', express.static(path.join(__dirname, 'uploads/products')));
 app.use('/uploads/profile-images', express.static(path.join(__dirname, 'uploads/profile-images')));
-// Add debug logging for file access
-app.use('/uploads', (req, res, next) => {
-    console.log('Accessing file:', req.url);
-    console.log('Full path:', path.join(__dirname, 'uploads', req.url));
-    next();
-});
 
+// Create necessary directories if they don't exist
 const directories = [
     path.join(DISK_MOUNT_PATH),
     path.join(DISK_MOUNT_PATH, 'profile-images'),
@@ -158,23 +178,6 @@ if (process.env.NODE_ENV === 'development') {
     const logStream = fs.createWriteStream(logFile, { flags: 'a' });
     app.use(morgan('combined', { stream: logStream }));
 }
-
-// Static Files Setup
-app.use('/uploads', express.static('/backend/uploads', {
-    setHeaders: (res) => {
-        res.set({
-            'Cross-Origin-Resource-Policy': 'cross-origin',
-            'Access-Control-Allow-Origin': '*',
-            'Access-Control-Allow-Methods': 'GET, HEAD, OPTIONS',
-            'Cache-Control': 'public, max-age=31536000'
-        });
-    }
-}));
-
-//app.use('/uploads/hero', express.static('/backend/uploads/hero'));
-//app.use('/uploads/products', express.static('/backend/uploads/products'));
-//app.use('/uploads/profile-images', express.static('/backend/uploads/profile-images'));
-
 
 // Root Route
 app.get('/', (req, res) => {
