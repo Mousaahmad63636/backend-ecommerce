@@ -1,9 +1,14 @@
 const multer = require('multer');
 const path = require('path');
 const fs = require('fs');
+
+// Get disk mount path from environment variable or use default based on screenshot
+const DISK_MOUNT_PATH = process.env.DISK_MOUNT_PATH || '/backend/uploads';
+
 // Helper function to ensure upload directories exist
 const ensureDirectoryExists = (dirPath) => {
-    const fullPath = path.join(__dirname, '..', dirPath);
+    // Use the DISK_MOUNT_PATH as the base directory
+    const fullPath = path.join(DISK_MOUNT_PATH, dirPath);
     if (!fs.existsSync(fullPath)) {
         fs.mkdirSync(fullPath, { recursive: true });
     }
@@ -13,7 +18,7 @@ const ensureDirectoryExists = (dirPath) => {
 // Product storage configuration
 const productStorage = multer.diskStorage({
     destination: function(req, file, cb) {
-        const uploadPath = ensureDirectoryExists('uploads/products');
+        const uploadPath = ensureDirectoryExists('products');
         cb(null, uploadPath);
     },
     filename: function(req, file, cb) {
@@ -25,7 +30,7 @@ const productStorage = multer.diskStorage({
 // Hero storage configuration
 const heroStorage = multer.diskStorage({
     destination: function(req, file, cb) {
-        const uploadPath = ensureDirectoryExists('uploads/hero');
+        const uploadPath = ensureDirectoryExists('hero');
         cb(null, uploadPath);
     },
     filename: function(req, file, cb) {
@@ -73,5 +78,6 @@ const heroUpload = multer({
 
 module.exports = {
     productUpload,
-    heroUpload
+    heroUpload,
+    DISK_MOUNT_PATH
 };

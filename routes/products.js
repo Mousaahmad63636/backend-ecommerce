@@ -4,7 +4,9 @@ const Product = require('../models/Product');
 const { auth, adminAuth } = require('../middleware/auth');
 const { productUpload } = require('../middleware/upload');
 const fs = require('fs');
+const { DISK_MOUNT_PATH } = require('../middleware/upload');
 const path = require('path');
+
 
 // Get all products
 router.get('/', async (req, res) => {
@@ -26,6 +28,7 @@ router.post('/add', productUpload.array('images', 5), async (req, res) => {
       return res.status(400).json({ message: 'At least one image is required' });
     }
 
+    // Store DATABASE paths as relative URLs, not filesystem paths
     const imagesPaths = req.files.map(file => `/uploads/products/${file.filename}`);
     
     // Parse the categories array from JSON
@@ -72,7 +75,7 @@ router.post('/add', productUpload.array('images', 5), async (req, res) => {
     // Delete uploaded images if product creation fails
     if (req.files && req.files.length > 0) {
       req.files.forEach(file => {
-        const filePath = path.join(__dirname, '..', 'uploads', 'products', file.filename);
+        const filePath = path.join(DISK_MOUNT_PATH, 'products', file.filename);
         if (fs.existsSync(filePath)) {
           try {
             fs.unlinkSync(filePath);
@@ -241,7 +244,9 @@ router.put('/:id', productUpload.array('images', 5), async (req, res) => {
 
           // Delete old images from storage
           existingProduct.images.forEach(imagePath => {
-            const fullPath = path.join(__dirname, '..', imagePath);
+            const filename = path.basename(imagePath);
+            const fullPath = path.join(DISK_MOUNT_PATH, 'products', filename);
+            
             if (fs.existsSync(fullPath)) {
               fs.unlinkSync(fullPath);
             }
@@ -312,9 +317,10 @@ router.delete('/:id', async (req, res) => {
     // Delete associated image files
     if (product.images && product.images.length > 0) {
       product.images.forEach(imagePath => {
-        // Remove the leading slash if it exists
-        const cleanPath = imagePath.replace(/^\//, '');
-        const fullPath = path.join(__dirname, '..', cleanPath);
+        // Extract filename from the URL-like path
+        const filename = path.basename(imagePath);
+        const fullPath = path.join(DISK_MOUNT_PATH, 'products', filename);
+        
         if (fs.existsSync(fullPath)) {
           fs.unlinkSync(fullPath);
         }

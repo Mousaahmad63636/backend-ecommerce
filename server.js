@@ -12,6 +12,7 @@ const Counter = require('./models/Counter');
 const timerRoutes = require('./routes/timer');
 require('dotenv').config();
 const uploadDir = '/backend/uploads/products';
+const { DISK_MOUNT_PATH } = require('./middleware/upload');
 if (!fs.existsSync(uploadDir)) {
     fs.mkdirSync(uploadDir, { recursive: true });
 }
@@ -82,18 +83,49 @@ app.use('/uploads', cors({
 }));
 
 // Static Files Setup
-app.use('/uploads', express.static(path.join(__dirname, 'uploads'), {
+app.use('/uploads', express.static(DISK_MOUNT_PATH, {
     setHeaders: (res) => {
         res.set({
             'Cross-Origin-Resource-Policy': 'cross-origin',
             'Access-Control-Allow-Origin': '*',
             'Access-Control-Allow-Methods': 'GET, HEAD, OPTIONS',
-            'Cache-Control': 'public, max-age=31536000',
-            'Access-Control-Allow-Credentials': 'false'  // Add this
+            'Cache-Control': 'public, max-age=31536000'
         });
     }
 }));
 
+app.use('/uploads/hero', express.static(path.join(DISK_MOUNT_PATH, 'hero')));
+app.use('/uploads/products', express.static(path.join(DISK_MOUNT_PATH, 'products')));
+app.use('/uploads/profile-images', express.static(path.join(DISK_MOUNT_PATH, 'profile-images')));
+
+
+// Add debug logging for file access
+app.use('/uploads', (req, res, next) => {
+    console.log('Accessing file:', req.url);
+    console.log('Full path:', path.join(DISK_MOUNT_PATH, req.url));
+    next();
+});
+
+const verifyDiskMount = () => {
+    try {
+      if (!fs.existsSync(DISK_MOUNT_PATH)) {
+        console.error(`WARNING: Disk mount path ${DISK_MOUNT_PATH} does not exist!`);
+        // Create it as a fallback
+        fs.mkdirSync(DISK_MOUNT_PATH, { recursive: true });
+        console.log(`Created disk mount path ${DISK_MOUNT_PATH}`);
+      } else {
+        console.log(`Verified disk mount path: ${DISK_MOUNT_PATH}`);
+        
+        // Test write permissions
+        const testFile = path.join(DISK_MOUNT_PATH, 'disk-test.txt');
+        fs.writeFileSync(testFile, 'Disk mount test');
+        fs.unlinkSync(testFile);
+        console.log('Disk mount is writable');
+      }
+    } catch (error) {
+      console.error('CRITICAL ERROR: Disk mount verification failed:', error);
+    }
+  };
 // Add these specific routes for different upload directories
 app.use('/uploads/hero', express.static(path.join(__dirname, 'uploads/hero')));
 app.use('/uploads/products', express.static(path.join(__dirname, 'uploads/products')));
@@ -106,10 +138,10 @@ app.use('/uploads', (req, res, next) => {
 });
 
 const directories = [
-    path.join(__dirname, 'uploads'),
-    path.join(__dirname, 'uploads/profile-images'),
-    path.join(__dirname, 'uploads/hero'),
-    path.join(__dirname, 'uploads/products'),
+    path.join(DISK_MOUNT_PATH),
+    path.join(DISK_MOUNT_PATH, 'profile-images'),
+    path.join(DISK_MOUNT_PATH, 'hero'),
+    path.join(DISK_MOUNT_PATH, 'products'),
     path.join(__dirname, 'logs')
 ];
 directories.forEach(dir => {
@@ -287,7 +319,7 @@ const startServer = async () => {
         process.exit(1);
     }
 };
-
+verifyDiskMount();
 startServer();
 
 module.exports = app;
