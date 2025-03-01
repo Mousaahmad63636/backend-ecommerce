@@ -92,7 +92,8 @@ router.post('/', adminAuth, async (req, res) => {
         categories: [categoryName],
         images: ['/placeholder.jpg'],
         stock: 0,
-        soldOut: true
+        soldOut: true,
+        hidden: true  // Add this flag to hide it from frontend
       });
       await placeholderProduct.save();
     } else {

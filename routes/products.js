@@ -11,7 +11,7 @@ const path = require('path');
 // Get all products
 router.get('/', async (req, res) => {
   try {
-    const products = await Product.find().sort({ createdAt: -1 });
+    const products = await Product.find({ hidden: { $ne: true } }).sort({ createdAt: -1 });
     res.json(products);
   } catch (err) {
     console.error('Error fetching products:', err);
@@ -101,7 +101,7 @@ router.post('/add', productUpload.array('images', 5), async (req, res) => {
 // Get best selling products
 router.get('/best-selling', async (req, res) => {
   try {
-    const products = await Product.find()
+    const products = await Product.find({ hidden: { $ne: true } })
       .sort({ salesCount: -1 })
       .limit(8);
     res.json(products);
@@ -116,7 +116,8 @@ router.get('/black-friday', async (req, res) => {
   try {
     const blackFridayProduct = await Product.findOne({
       isBlackFridayDeal: true,
-      discountEndDate: { $gt: new Date() }
+      discountEndDate: { $gt: new Date() },
+      hidden: { $ne: true }
     }).lean();
 
     if (!blackFridayProduct) {
@@ -176,11 +177,40 @@ router.post('/black-friday', adminAuth, async (req, res) => {
     res.status(500).json({ message: 'Error applying Black Friday discount' });
   }
 });
+router.get('/search', async (req, res) => {
+  try {
+    const { q } = req.query;
+    if (!q) {
+      return res.status(400).json({ message: 'Search query is required' });
+    }
+
+    const products = await Product.find({
+      $and: [
+        { hidden: { $ne: true } },
+        {
+          $or: [
+            { name: { $regex: q, $options: 'i' } },
+            { description: { $regex: q, $options: 'i' } },
+            { category: { $regex: q, $options: 'i' } }
+          ]
+        }
+      ]
+    });
+    res.json(products);
+  } catch (err) {
+    console.error('Error searching products:', err);
+    res.status(500).json({ message: err.message });
+  }
+});
 
 // Get single product
 router.get('/:id', async (req, res) => {
   try {
-    const product = await Product.findById(req.params.id);
+    const product = await Product.findOne({ 
+      _id: req.params.id,
+      hidden: { $ne: true }
+    });
+    
     if (!product) {
       return res.status(404).json({ message: 'Product not found' });
     }
