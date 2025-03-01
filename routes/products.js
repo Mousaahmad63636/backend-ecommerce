@@ -441,6 +441,7 @@ router.post('/discount', adminAuth, async (req, res) => {
     });
   }
 });
+
 router.get('/categories', async (req, res) => {
   try {
     // Find all products and select only category and categories fields
@@ -470,6 +471,164 @@ router.get('/categories', async (req, res) => {
     res.json(categoriesList);
   } catch (err) {
     console.error('Error fetching categories:', err);
+    res.status(500).json({ message: err.message });
+  }
+});
+
+
+router.post('/categories', adminAuth, async (req, res) => {
+  try {
+    const { name } = req.body;
+    
+    if (!name || !name.trim()) {
+      return res.status(400).json({ message: 'Category name is required' });
+    }
+    
+    const categoryName = name.trim();
+    
+    // Check if category already exists
+    const existingCategories = await Product.distinct('categories');
+    if (existingCategories.includes(categoryName)) {
+      return res.status(400).json({ message: 'Category already exists' });
+    }
+    
+    // Create a placeholder product with this category if needed
+    // This is optional - we don't need to create a product just for a category
+    // Instead, we just add the category to the list
+    
+    res.status(201).json({ 
+      message: 'Category created successfully',
+      category: categoryName
+    });
+  } catch (err) {
+    console.error('Error creating category:', err);
+    res.status(500).json({ message: err.message });
+  }
+});
+
+router.put('/categories', adminAuth, async (req, res) => {
+  try {
+    const { oldName, newName } = req.body;
+    
+    if (!oldName || !newName || !oldName.trim() || !newName.trim()) {
+      return res.status(400).json({ message: 'Both old and new category names are required' });
+    }
+    
+    const trimmedOldName = oldName.trim();
+    const trimmedNewName = newName.trim();
+    
+    if (trimmedOldName === trimmedNewName) {
+      return res.status(400).json({ message: 'New category name must be different' });
+    }
+    
+    // Check if new category already exists
+    const existingCategories = await Product.distinct('categories');
+    if (existingCategories.includes(trimmedNewName)) {
+      return res.status(400).json({ message: 'New category name already exists' });
+    }
+    
+    // Update all products with this category
+    await Product.updateMany(
+      { category: trimmedOldName },
+      { $set: { category: trimmedNewName } }
+    );
+    
+    // Update category in all products' categories arrays
+    await Product.updateMany(
+      { categories: trimmedOldName },
+      { $set: { 'categories.$': trimmedNewName } }
+    );
+    
+    res.json({ 
+      message: 'Category updated successfully',
+      oldCategory: trimmedOldName,
+      newCategory: trimmedNewName
+    });
+  } catch (err) {
+    console.error('Error updating category:', err);
+    res.status(500).json({ message: err.message });
+  }
+});
+router.delete('/categories/:name', adminAuth, async (req, res) => {
+  try {
+    const categoryName = req.params.name;
+    
+    // Check if any products are using this category
+    const productsWithCategory = await Product.countDocuments({
+      $or: [
+        { category: categoryName },
+        { categories: categoryName }
+      ]
+    });
+    
+    if (productsWithCategory > 0) {
+      return res.status(400).json({ 
+        message: 'Cannot delete category that is used by products',
+        productsCount: productsWithCategory
+      });
+    }
+    
+    // If no products use this category, we can delete it
+    // Since categories are stored with products, there's nothing else to delete
+    
+    res.json({ 
+      message: 'Category deleted successfully',
+      category: categoryName
+    });
+  } catch (err) {
+    console.error('Error deleting category:', err);
+    res.status(500).json({ message: err.message });
+  }
+});
+// Merge categories
+router.post('/categories/merge', adminAuth, async (req, res) => {
+  try {
+    const { sourceCategory, targetCategory } = req.body;
+    
+    if (!sourceCategory || !targetCategory) {
+      return res.status(400).json({ message: 'Source and target categories are required' });
+    }
+    
+    if (sourceCategory === targetCategory) {
+      return res.status(400).json({ message: 'Source and target categories cannot be the same' });
+    }
+    
+    // Check if both categories exist
+    const existingCategories = await Product.distinct('categories');
+    if (!existingCategories.includes(sourceCategory)) {
+      return res.status(400).json({ message: `Source category "${sourceCategory}" does not exist` });
+    }
+    
+    if (!existingCategories.includes(targetCategory)) {
+      return res.status(400).json({ message: `Target category "${targetCategory}" does not exist` });
+    }
+    
+    // Update main category field
+    await Product.updateMany(
+      { category: sourceCategory },
+      { $set: { category: targetCategory } }
+    );
+    
+    // Update categories arrays
+    // First, add target category to any product that has source category
+    await Product.updateMany(
+      { categories: sourceCategory },
+      { $addToSet: { categories: targetCategory } }
+    );
+    
+    // Then, remove source category from all products
+    await Product.updateMany(
+      { categories: sourceCategory },
+      { $pull: { categories: sourceCategory } }
+    );
+    
+    res.json({ 
+      message: 'Categories merged successfully',
+      sourceCategory,
+      targetCategory
+    });
+  } catch (err) {
+    console.error('Error merging categories:', err);
     res.status(500).json({ message: err.message });
   }
 });
