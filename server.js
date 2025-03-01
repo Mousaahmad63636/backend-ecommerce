@@ -119,8 +119,7 @@ app.use('/uploads', express.static(DISK_MOUNT_PATH, {
 app.use('/uploads/hero', express.static(path.join(DISK_MOUNT_PATH, 'hero')));
 app.use('/uploads/products', express.static(path.join(DISK_MOUNT_PATH, 'products')));
 app.use('/uploads/profile-images', express.static(path.join(DISK_MOUNT_PATH, 'profile-images')));
-// Register the new categories route
-app.use('/api/categories', require('./routes/categories'));
+
 // Debug logging for file access - helpful for debugging WhatsApp crawler issues
 app.use('/uploads', (req, res, next) => {
     const userAgent = req.get('User-Agent') || 'Unknown';
@@ -187,7 +186,15 @@ app.get('/', (req, res) => {
         version: '1.0.0',
         status: 'healthy',
         timestamp: new Date(),
-        endpoints: ['/api/products', '/api/users', '/api/orders', '/api/settings', '/api/promo-codes']
+        endpoints: [
+            '/api/products', 
+            '/api/users', 
+            '/api/orders', 
+            '/api/settings', 
+            '/api/promo-codes', 
+            '/api/timer',
+            '/api/categories'  // Added categories endpoint
+        ]
     });
 });
 
@@ -211,9 +218,11 @@ const routes = {
     'promo-codes': require('./routes/promoCodes')
 };
 
+// Register API routes
 app.use('/api/timer', timerRoutes);
 app.use('/api/settings', require('./routes/settings'));
 app.use('/api/promo-codes', require('./routes/promoCodes'));
+app.use('/api/categories', require('./routes/categories')); // Moved here with other API routes
 
 Object.entries(routes).forEach(([key, router]) => {
     const path = `/api/${key}`;
@@ -264,7 +273,8 @@ app.use((req, res, next) => {
             '/api/orders',
             '/api/settings',
             '/api/promo-codes',
-            '/api/timer'
+            '/api/timer',
+            '/api/categories'  // Added categories endpoint
         ]
     });
 });
