@@ -441,7 +441,38 @@ router.post('/discount', adminAuth, async (req, res) => {
     });
   }
 });
-
+router.get('/categories', async (req, res) => {
+  try {
+    // Find all products and select only category and categories fields
+    const products = await Product.find().select('category categories');
+    
+    // Create a Set to store unique categories
+    const categoriesSet = new Set();
+    
+    // Add all categories to the Set
+    products.forEach(product => {
+      // Add primary category
+      if (product.category) {
+        categoriesSet.add(product.category);
+      }
+      
+      // Add categories from array
+      if (Array.isArray(product.categories)) {
+        product.categories.forEach(category => {
+          if (category) categoriesSet.add(category);
+        });
+      }
+    });
+    
+    // Convert Set to Array and sort alphabetically
+    const categoriesList = [...categoriesSet].sort();
+    
+    res.json(categoriesList);
+  } catch (err) {
+    console.error('Error fetching categories:', err);
+    res.status(500).json({ message: err.message });
+  }
+});
 // Reset product discounts
 router.post('/reset-discount', adminAuth, async (req, res) => {
   try {
