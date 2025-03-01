@@ -444,27 +444,26 @@ router.post('/discount', adminAuth, async (req, res) => {
 
 router.get('/categories', async (req, res) => {
   try {
-    console.log('Fetching categories...'); // Add this line
+    console.log('Fetching categories...');
     
-    // Use a simpler, more reliable approach to get categories
-    const primaryCategories = await Product.distinct('category');
-    const categoriesArrays = await Product.distinct('categories');
+    // Use a direct approach to get products with their categories
+    const products = await Product.find({}, { category: 1, categories: 1 });
+    console.log(`Found ${products.length} products`);
     
     // Create a Set to handle duplicates
     const categoriesSet = new Set();
     
-    // Add primary categories
-    primaryCategories.forEach(category => {
-      if (category && category.trim()) {
-        categoriesSet.add(category.trim());
+    // Process each product's categories
+    products.forEach(product => {
+      // Add the primary category
+      if (product.category && typeof product.category === 'string' && product.category.trim()) {
+        categoriesSet.add(product.category.trim());
       }
-    });
-    
-    // Add categories from arrays (flatten the array of arrays)
-    categoriesArrays.forEach(categoryArray => {
-      if (Array.isArray(categoryArray)) {
-        categoryArray.forEach(category => {
-          if (category && category.trim()) {
+      
+      // Add categories from the categories array
+      if (Array.isArray(product.categories)) {
+        product.categories.forEach(category => {
+          if (category && typeof category === 'string' && category.trim()) {
             categoriesSet.add(category.trim());
           }
         });
@@ -473,11 +472,11 @@ router.get('/categories', async (req, res) => {
     
     // Convert to sorted array
     const categoriesList = [...categoriesSet].sort();
-    console.log(`Found ${categoriesList.length} categories`); // Add this line
+    console.log(`Found ${categoriesList.length} unique categories`);
     
     res.json(categoriesList);
   } catch (err) {
-    console.error('Error fetching categories:', err); // Add this line
+    console.error('Error fetching categories:', err);
     res.status(500).json({ 
       message: 'Error fetching categories', 
       error: err.message 
