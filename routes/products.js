@@ -444,34 +444,44 @@ router.post('/discount', adminAuth, async (req, res) => {
 
 router.get('/categories', async (req, res) => {
   try {
-    // Find all products and select only category and categories fields
-    const products = await Product.find().select('category categories');
+    console.log('Fetching categories...'); // Add this line
     
-    // Create a Set to store unique categories
+    // Use a simpler, more reliable approach to get categories
+    const primaryCategories = await Product.distinct('category');
+    const categoriesArrays = await Product.distinct('categories');
+    
+    // Create a Set to handle duplicates
     const categoriesSet = new Set();
     
-    // Add all categories to the Set
-    products.forEach(product => {
-      // Add primary category
-      if (product.category) {
-        categoriesSet.add(product.category);
+    // Add primary categories
+    primaryCategories.forEach(category => {
+      if (category && category.trim()) {
+        categoriesSet.add(category.trim());
       }
-      
-      // Add categories from array
-      if (Array.isArray(product.categories)) {
-        product.categories.forEach(category => {
-          if (category) categoriesSet.add(category);
+    });
+    
+    // Add categories from arrays (flatten the array of arrays)
+    categoriesArrays.forEach(categoryArray => {
+      if (Array.isArray(categoryArray)) {
+        categoryArray.forEach(category => {
+          if (category && category.trim()) {
+            categoriesSet.add(category.trim());
+          }
         });
       }
     });
     
-    // Convert Set to Array and sort alphabetically
+    // Convert to sorted array
     const categoriesList = [...categoriesSet].sort();
+    console.log(`Found ${categoriesList.length} categories`); // Add this line
     
     res.json(categoriesList);
   } catch (err) {
-    console.error('Error fetching categories:', err);
-    res.status(500).json({ message: err.message });
+    console.error('Error fetching categories:', err); // Add this line
+    res.status(500).json({ 
+      message: 'Error fetching categories', 
+      error: err.message 
+    });
   }
 });
 
@@ -488,13 +498,21 @@ router.post('/categories', adminAuth, async (req, res) => {
     
     // Check if category already exists
     const existingCategories = await Product.distinct('categories');
-    if (existingCategories.includes(categoryName)) {
+    const primaryCategories = await Product.distinct('category');
+    const allCategories = [...new Set([...existingCategories.flat(), ...primaryCategories])];
+    
+    if (allCategories.includes(categoryName)) {
       return res.status(400).json({ message: 'Category already exists' });
     }
     
-    // Create a placeholder product with this category if needed
-    // This is optional - we don't need to create a product just for a category
-    // Instead, we just add the category to the list
+    // Since we don't have a separate Categories collection,
+    // we'll create a placeholder product if needed
+    const placeholderProduct = await Product.findOne({ name: 'Category Placeholder' });
+    
+    if (!placeholderProduct) {
+      // Option 1: We could create a placeholder product
+      // But better not to modify the catalog for this purpose
+    }
     
     res.status(201).json({ 
       message: 'Category created successfully',
@@ -505,6 +523,7 @@ router.post('/categories', adminAuth, async (req, res) => {
     res.status(500).json({ message: err.message });
   }
 });
+
 
 router.put('/categories', adminAuth, async (req, res) => {
   try {
@@ -523,35 +542,59 @@ router.put('/categories', adminAuth, async (req, res) => {
     
     // Check if new category already exists
     const existingCategories = await Product.distinct('categories');
-    if (existingCategories.includes(trimmedNewName)) {
+    const primaryCategories = await Product.distinct('category');
+    const allCategories = [...new Set([...existingCategories.flat(), ...primaryCategories])];
+    
+    if (allCategories.includes(trimmedNewName)) {
       return res.status(400).json({ message: 'New category name already exists' });
     }
     
-    // Update all products with this category
-    await Product.updateMany(
+    // Update primary category
+    const primaryResult = await Product.updateMany(
       { category: trimmedOldName },
       { $set: { category: trimmedNewName } }
     );
     
-    // Update category in all products' categories arrays
-    await Product.updateMany(
-      { categories: trimmedOldName },
-      { $set: { 'categories.$': trimmedNewName } }
-    );
+    console.log(`Updated ${primaryResult.modifiedCount} products with primary category`);
+    
+    // Update categories array (using aggregation for safety)
+    const productsToUpdate = await Product.find({ categories: trimmedOldName });
+    
+    let updatedArrayCount = 0;
+    for (const product of productsToUpdate) {
+      const updatedCategories = product.categories.map(c => 
+        c === trimmedOldName ? trimmedNewName : c
+      );
+      
+      await Product.updateOne(
+        { _id: product._id },
+        { $set: { categories: updatedCategories } }
+      );
+      updatedArrayCount++;
+    }
+    
+    console.log(`Updated ${updatedArrayCount} products with category in array`);
     
     res.json({ 
       message: 'Category updated successfully',
       oldCategory: trimmedOldName,
-      newCategory: trimmedNewName
+      newCategory: trimmedNewName,
+      updatedPrimary: primaryResult.modifiedCount,
+      updatedArray: updatedArrayCount
     });
   } catch (err) {
     console.error('Error updating category:', err);
     res.status(500).json({ message: err.message });
   }
 });
+
 router.delete('/categories/:name', adminAuth, async (req, res) => {
   try {
-    const categoryName = req.params.name;
+    const categoryName = decodeURIComponent(req.params.name);
+    
+    if (!categoryName) {
+      return res.status(400).json({ message: 'Category name is required' });
+    }
     
     // Check if any products are using this category
     const productsWithCategory = await Product.countDocuments({
@@ -568,8 +611,7 @@ router.delete('/categories/:name', adminAuth, async (req, res) => {
       });
     }
     
-    // If no products use this category, we can delete it
-    // Since categories are stored with products, there's nothing else to delete
+    // Nothing to delete in database since we don't have a separate Categories collection
     
     res.json({ 
       message: 'Category deleted successfully',
@@ -580,7 +622,8 @@ router.delete('/categories/:name', adminAuth, async (req, res) => {
     res.status(500).json({ message: err.message });
   }
 });
-// Merge categories
+
+
 router.post('/categories/merge', adminAuth, async (req, res) => {
   try {
     const { sourceCategory, targetCategory } = req.body;
@@ -593,39 +636,53 @@ router.post('/categories/merge', adminAuth, async (req, res) => {
       return res.status(400).json({ message: 'Source and target categories cannot be the same' });
     }
     
-    // Check if both categories exist
+    // Check if categories exist
     const existingCategories = await Product.distinct('categories');
-    if (!existingCategories.includes(sourceCategory)) {
+    const primaryCategories = await Product.distinct('category');
+    const allCategories = [...new Set([...existingCategories.flat(), ...primaryCategories])];
+    
+    if (!allCategories.includes(sourceCategory)) {
       return res.status(400).json({ message: `Source category "${sourceCategory}" does not exist` });
     }
     
-    if (!existingCategories.includes(targetCategory)) {
+    if (!allCategories.includes(targetCategory)) {
       return res.status(400).json({ message: `Target category "${targetCategory}" does not exist` });
     }
     
-    // Update main category field
-    await Product.updateMany(
+    // Update primary category
+    const primaryResult = await Product.updateMany(
       { category: sourceCategory },
       { $set: { category: targetCategory } }
     );
     
-    // Update categories arrays
-    // First, add target category to any product that has source category
-    await Product.updateMany(
-      { categories: sourceCategory },
-      { $addToSet: { categories: targetCategory } }
-    );
+    // Update categories array (using aggregation for safety)
+    const productsToUpdate = await Product.find({ categories: sourceCategory });
     
-    // Then, remove source category from all products
-    await Product.updateMany(
-      { categories: sourceCategory },
-      { $pull: { categories: sourceCategory } }
-    );
+    let updatedArrayCount = 0;
+    for (const product of productsToUpdate) {
+      // Add target category if not present
+      if (!product.categories.includes(targetCategory)) {
+        await Product.updateOne(
+          { _id: product._id },
+          { $addToSet: { categories: targetCategory } }
+        );
+      }
+      
+      // Remove source category
+      await Product.updateOne(
+        { _id: product._id },
+        { $pull: { categories: sourceCategory } }
+      );
+      
+      updatedArrayCount++;
+    }
     
     res.json({ 
       message: 'Categories merged successfully',
       sourceCategory,
-      targetCategory
+      targetCategory,
+      updatedPrimary: primaryResult.modifiedCount,
+      updatedArray: updatedArrayCount
     });
   } catch (err) {
     console.error('Error merging categories:', err);
