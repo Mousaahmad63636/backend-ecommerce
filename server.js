@@ -119,7 +119,8 @@ app.use('/uploads', express.static(DISK_MOUNT_PATH, {
 app.use('/uploads/hero', express.static(path.join(DISK_MOUNT_PATH, 'hero')));
 app.use('/uploads/products', express.static(path.join(DISK_MOUNT_PATH, 'products')));
 app.use('/uploads/profile-images', express.static(path.join(DISK_MOUNT_PATH, 'profile-images')));
-
+// Register the new categories route
+app.use('/api/categories', require('./routes/categories'));
 // Debug logging for file access - helpful for debugging WhatsApp crawler issues
 app.use('/uploads', (req, res, next) => {
     const userAgent = req.get('User-Agent') || 'Unknown';
