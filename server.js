@@ -12,6 +12,7 @@ const Counter = require('./models/Counter');
 const timerRoutes = require('./routes/timer');
 require('dotenv').config();
 const uploadDir = '/backend/uploads/products';
+const sharp = require('sharp'); 
 const { DISK_MOUNT_PATH } = require('./middleware/upload');
 if (!fs.existsSync(uploadDir)) {
     fs.mkdirSync(uploadDir, { recursive: true });
@@ -117,7 +118,29 @@ app.use('/uploads', express.static(DISK_MOUNT_PATH, {
         }
     }
 }));
-
+app.get('/api/preview/:productId', async (req, res) => {
+    try {
+      const product = await Product.findById(req.params.productId);
+      if (!product || !product.images || product.images.length === 0) {
+        return res.status(404).send('Product or image not found');
+      }
+      
+      const imagePath = path.join(DISK_MOUNT_PATH, 'products', path.basename(product.images[0]));
+      
+      // Create optimized preview image
+      const optimizedImage = await sharp(imagePath)
+        .resize(1200, 630, { fit: 'inside' })
+        .toBuffer();
+      
+      res.set('Content-Type', 'image/jpeg');
+      res.set('Cross-Origin-Resource-Policy', 'cross-origin');
+      res.set('Access-Control-Allow-Origin', '*');
+      res.send(optimizedImage);
+    } catch (error) {
+      console.error('Preview generation error:', error);
+      res.status(500).send('Error generating preview');
+    }
+  });
 // Set up specific routes for different upload directories
 app.use('/uploads/hero', express.static(path.join(DISK_MOUNT_PATH, 'hero')));
 app.use('/uploads/products', express.static(path.join(DISK_MOUNT_PATH, 'products')));
