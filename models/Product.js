@@ -26,6 +26,11 @@ const productSchema = new mongoose.Schema({
     min: 0,
     max: 100
   },
+  discountType: {
+    type: String,
+    enum: ['percentage', 'fixed'],
+    default: 'percentage'
+  },
   discountEndDate: {
     type: Date
   },
@@ -86,7 +91,11 @@ const productSchema = new mongoose.Schema({
 productSchema.pre('save', function(next) {
   if (this.discountEndDate && new Date() > this.discountEndDate) {
     this.discountPercentage = 0;
-    this.price = this.originalPrice;
+    this.discountType = 'percentage'; // Reset to default type
+    if (this.originalPrice) {
+      this.price = this.originalPrice;
+      this.originalPrice = null; // Clear original price after restoring
+    }
     this.discountEndDate = null;
     this.isBlackFridayDeal = false;
   }
@@ -116,12 +125,30 @@ productSchema.virtual('hasActiveDiscount').get(function() {
          new Date() < this.discountEndDate;
 });
 
-// Method to calculate current price
+// Method to calculate current price with proper handling of fixed and percentage discounts
 productSchema.methods.getCurrentPrice = function() {
   if (this.hasActiveDiscount) {
-    return this.price;
+    if (this.discountType === 'fixed') {
+      // For fixed discount, subtract the amount from original price
+      return Math.max(0, (this.originalPrice || this.price) - this.discountPercentage);
+    } else {
+      // For percentage discount, apply percentage reduction
+      return this.price;
+    }
   }
   return this.originalPrice || this.price;
+};
+
+// Helper method to calculate the discount amount (useful for displaying to users)
+productSchema.methods.getDiscountAmount = function() {
+  if (!this.hasActiveDiscount) return 0;
+  
+  if (this.discountType === 'fixed') {
+    return this.discountPercentage; // Return the fixed amount directly
+  } else {
+    // For percentage, calculate the actual amount saved
+    return (this.originalPrice || this.price) * (this.discountPercentage / 100);
+  }
 };
 
 const Product = mongoose.model('Product', productSchema);

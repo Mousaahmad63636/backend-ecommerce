@@ -412,10 +412,17 @@ router.put('/:id/toggle-sold-out', async (req, res) => {
 // Apply discount to products
 router.post('/discount', adminAuth, async (req, res) => {
   try {
-    const { type, value, targetId, category, discountEndDate } = req.body;
+    const { type, discountType, value, targetId, category, discountEndDate } = req.body;
+    console.log('Applying discount with data:', req.body);
 
-    if (!value || value < 0 || value > 100) {
-      return res.status(400).json({ message: 'Invalid discount percentage' });
+    // Validate discount value based on type
+    if (!value || value < 0) {
+      return res.status(400).json({ message: 'Invalid discount value' });
+    }
+
+    // Percentage discounts can't exceed 100%
+    if (discountType === 'percentage' && value > 100) {
+      return res.status(400).json({ message: 'Percentage discount cannot exceed 100%' });
     }
 
     let query = {};
@@ -440,7 +447,16 @@ router.post('/discount', adminAuth, async (req, res) => {
     // Update each product with discount and end date
     const updatePromises = products.map(async (product) => {
       const originalPrice = product.originalPrice || product.price;
-      const discountedPrice = originalPrice * (1 - value / 100);
+      let discountedPrice;
+
+      // Calculate new price based on discount type
+      if (discountType === 'fixed') {
+        // Fixed amount discount
+        discountedPrice = Math.max(0, originalPrice - value);
+      } else {
+        // Percentage discount (default)
+        discountedPrice = originalPrice * (1 - value / 100);
+      }
 
       return Product.findByIdAndUpdate(
         product._id,
@@ -449,7 +465,8 @@ router.post('/discount', adminAuth, async (req, res) => {
             originalPrice: originalPrice,
             price: discountedPrice,
             discountPercentage: value,
-            discountEndDate: discountEndDate // Save the end date
+            discountType: discountType,
+            discountEndDate: discountEndDate
           }
         },
         { new: true }
@@ -718,6 +735,7 @@ router.post('/categories/merge', adminAuth, async (req, res) => {
     res.status(500).json({ message: err.message });
   }
 });
+
 // Reset product discounts
 router.post('/reset-discount', adminAuth, async (req, res) => {
   try {
@@ -729,6 +747,7 @@ router.post('/reset-discount', adminAuth, async (req, res) => {
       $set: {
         price: '$originalPrice',
         discountPercentage: 0,
+        discountType: null,
         discountEndDate: null,
         isBlackFridayDeal: false
       }
@@ -742,6 +761,7 @@ router.post('/reset-discount', adminAuth, async (req, res) => {
           $set: {
             price: { $ifNull: ['$originalPrice', '$price'] },
             discountPercentage: 0,
+            discountType: null,
             discountEndDate: null,
             isBlackFridayDeal: false,
             originalPrice: null
