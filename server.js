@@ -19,7 +19,7 @@ if (!fs.existsSync(uploadDir)) {
 // Initialize Express app
 const app = express();
 
-// CORS Configuration
+// CORS Configuration with special handling for WhatsApp crawler
 const corsOptions = {
     origin: function(origin, callback) {
         const allowedOrigins = [
@@ -28,8 +28,11 @@ const corsOptions = {
             'http://localhost:3000'
         ];
         
-        // Allow requests with no origin (like mobile apps, curl requests, WhatsApp crawler)
-        if (!origin || allowedOrigins.indexOf(origin) !== -1) {
+        // Always allow WhatsApp crawler access
+        if (!origin || 
+            allowedOrigins.indexOf(origin) !== -1 || 
+            origin.includes('whatsapp') || 
+            origin.includes('facebook')) {
             callback(null, true);
         } else {
             console.log('Blocked by CORS: ', origin);
@@ -120,6 +123,38 @@ app.use('/uploads/hero', express.static(path.join(DISK_MOUNT_PATH, 'hero')));
 app.use('/uploads/products', express.static(path.join(DISK_MOUNT_PATH, 'products')));
 app.use('/uploads/profile-images', express.static(path.join(DISK_MOUNT_PATH, 'profile-images')));
 
+// Special route for WhatsApp crawler to access images directly
+app.get('/uploads/products/:filename', (req, res, next) => {
+    const userAgent = req.get('User-Agent') || '';
+    if (userAgent.includes('WhatsApp') || userAgent.includes('facebookexternalhit')) {
+        const filePath = path.join(DISK_MOUNT_PATH, 'products', req.params.filename);
+        console.log('WhatsApp crawler accessing file:', filePath);
+        
+        if (fs.existsSync(filePath)) {
+            // Set additional headers for WhatsApp crawler
+            res.set({
+                'Cross-Origin-Resource-Policy': 'cross-origin',
+                'Access-Control-Allow-Origin': '*',
+                'Cache-Control': 'public, max-age=31536000'
+            });
+            
+            // Set content type based on file extension
+            if (filePath.endsWith('.jpg') || filePath.endsWith('.jpeg')) {
+                res.set('Content-Type', 'image/jpeg');
+            } else if (filePath.endsWith('.png')) {
+                res.set('Content-Type', 'image/png');
+            } else if (filePath.endsWith('.gif')) {
+                res.set('Content-Type', 'image/gif');
+            } else if (filePath.endsWith('.webp')) {
+                res.set('Content-Type', 'image/webp');
+            }
+            
+            return res.sendFile(filePath);
+        }
+    }
+    next();
+});
+
 // Debug logging for file access - helpful for debugging WhatsApp crawler issues
 app.use('/uploads', (req, res, next) => {
     const userAgent = req.get('User-Agent') || 'Unknown';
@@ -195,6 +230,17 @@ app.get('/', (req, res) => {
             '/api/timer',
             '/api/categories'  // Added categories endpoint
         ]
+    });
+});
+
+// Special endpoint to test WhatsApp preview images
+app.get('/whatsapp-test', (req, res) => {
+    const userAgent = req.get('User-Agent') || 'Unknown';
+    res.json({
+        message: 'WhatsApp crawler test endpoint',
+        userAgent,
+        isWhatsApp: userAgent.includes('WhatsApp') || userAgent.includes('facebookexternalhit'),
+        timestamp: new Date().toISOString()
     });
 });
 
