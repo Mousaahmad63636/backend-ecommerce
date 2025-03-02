@@ -1,3 +1,4 @@
+// backend/models/Settings.js
 const mongoose = require('mongoose');
 
 const settingsSchema = new mongoose.Schema({
@@ -11,7 +12,7 @@ const settingsSchema = new mongoose.Schema({
       default: `🛍️ *طلب جديد*\n──────────────\n\nمرحباً {{customerName}}! 👋\n\nتم استلام طلبك بنجاح ✅\nرقم الطلب: #{{orderId}}`
     }
   },
-  // Add hero section settings
+  // Hero section settings
   heroSection: {
     type: {
       type: String,
@@ -30,7 +31,12 @@ const settingsSchema = new mongoose.Schema({
       type: String,
       default: 'Discover amazing products at great prices'
     }
-  }  // Added this closing brace
+  },
+  // Add banner text field
+  bannerText: {
+    type: String,
+    default: 'Summer Sale For All Swim Suits And Free Express Delivery - OFF 50%! ShopNow'
+  }
 }, {
   timestamps: true
 });
