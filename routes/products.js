@@ -49,6 +49,36 @@ router.post('/add', productUpload.array('images', 5), async (req, res) => {
       }
     }
 
+    // Parse colors array from JSON
+    let colors = [];
+    if (req.body.colors) {
+      try {
+        colors = JSON.parse(req.body.colors);
+        console.log('Parsed colors:', colors);
+        if (!Array.isArray(colors)) {
+          colors = [];
+        }
+      } catch (e) {
+        console.error('Error parsing colors JSON:', e);
+        colors = [];
+      }
+    }
+
+    // Parse sizes array from JSON
+    let sizes = [];
+    if (req.body.sizes) {
+      try {
+        sizes = JSON.parse(req.body.sizes);
+        console.log('Parsed sizes:', sizes);
+        if (!Array.isArray(sizes)) {
+          sizes = [];
+        }
+      } catch (e) {
+        console.error('Error parsing sizes JSON:', e);
+        sizes = [];
+      }
+    }
+
     // Ensure backward compatibility - use first category as main if not provided
     const category = req.body.category || (categories.length > 0 ? categories[0] : '');
     
@@ -69,10 +99,13 @@ router.post('/add', productUpload.array('images', 5), async (req, res) => {
       categories: categories,
       images: imagesPaths,
       rating: rating, 
-      reviewCount: reviewCount
+      reviewCount: reviewCount,
+      colors: colors,       // Add the parsed colors array
+      sizes: sizes          // Add the parsed sizes array
     });
 
     console.log('Saving product with categories:', categories);
+    console.log('Product colors:', colors, 'sizes:', sizes);
     console.log('Product rating:', rating, 'review count:', reviewCount);
     
     const savedProduct = await newProduct.save();
@@ -221,7 +254,6 @@ router.get('/:id', async (req, res) => {
   }
 });
 
-// Update product with multiple categories support
 router.put('/:id', productUpload.array('images', 5), async (req, res) => {
   try {
     console.log('Update request for product ID:', req.params.id);
@@ -267,6 +299,38 @@ router.put('/:id', productUpload.array('images', 5), async (req, res) => {
     } else if (updateData.category) {
       // If no categories array but category exists, create a categories array with that category
       updateData.categories = [updateData.category];
+    }
+    
+    // Parse colors array from JSON
+    if (req.body.colors) {
+      try {
+        const colorsArray = JSON.parse(req.body.colors);
+        console.log('Parsed colors:', colorsArray);
+        if (Array.isArray(colorsArray)) {
+          updateData.colors = colorsArray;
+        } else {
+          updateData.colors = [];
+        }
+      } catch (err) {
+        console.error('Error parsing colors array:', err);
+        updateData.colors = [];
+      }
+    }
+
+    // Parse sizes array from JSON
+    if (req.body.sizes) {
+      try {
+        const sizesArray = JSON.parse(req.body.sizes);
+        console.log('Parsed sizes:', sizesArray);
+        if (Array.isArray(sizesArray)) {
+          updateData.sizes = sizesArray;
+        } else {
+          updateData.sizes = [];
+        }
+      } catch (err) {
+        console.error('Error parsing sizes array:', err);
+        updateData.sizes = [];
+      }
     }
     
     console.log('Final update data:', updateData);
