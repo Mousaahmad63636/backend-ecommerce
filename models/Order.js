@@ -17,20 +17,25 @@ const orderSchema = new mongoose.Schema({
       type: Number,
       required: true,
       min: 1
+    },
+    price: {
+      type: Number,
+      required: true,
+      min: 0
+    },
+    selectedColor: {
+      type: String,
+      default: ''
+    },
+    selectedSize: {
+      type: String,
+      default: ''
     }
   }],
   subtotal: {
     type: Number,
     required: true,
     min: 0
-  },
-  selectedColor: {
-    type: String,
-    default: ''
-  },
-  selectedSize: {
-    type: String,
-    default: ''
   },
   promoDiscount: {
     type: {
