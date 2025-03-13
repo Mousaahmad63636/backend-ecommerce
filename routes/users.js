@@ -51,7 +51,6 @@ router.post('/register', async (req, res) => {
     }
 });
 
-// Add this to routes/users.js
 router.put('/fcm-token', auth, async (req, res) => {
   try {
     const { fcmToken } = req.body;
@@ -61,12 +60,13 @@ router.put('/fcm-token', auth, async (req, res) => {
     }
     
     // Update the user's FCM token
-    await User.findByIdAndUpdate(req.user.id, { fcmToken });
+    const user = await User.findByIdAndUpdate(
+      req.user._id,
+      { fcmToken: fcmToken },
+      { new: true }
+    );
     
-    res.status(200).json({ 
-      message: 'FCM token updated successfully',
-      success: true
-    });
+    res.json({ message: 'FCM token updated successfully' });
   } catch (error) {
     console.error('Error updating FCM token:', error);
     res.status(500).json({ message: 'Server error' });
