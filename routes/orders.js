@@ -72,7 +72,26 @@ router.post('/validate-promo', async (req, res) => {
     });
   }
 });
-
+// Add this to your routes/users.js file
+router.get('/admin-tokens', auth, async (req, res) => {
+  try {
+    // Verify the user is an admin
+    if (!req.user.role || req.user.role !== 'admin') {
+      return res.status(403).json({ message: 'Forbidden' });
+    }
+    
+    const adminTokens = await User.getAdminFCMTokens();
+    
+    res.json({
+      success: true,
+      count: adminTokens.length,
+      tokens: adminTokens.map(token => token.substring(0, 10) + '...') // Only return partial tokens for security
+    });
+  } catch (error) {
+    console.error('Error getting admin tokens:', error);
+    res.status(500).json({ message: 'Server error' });
+  }
+});
 router.post('/', async (req, res) => {
   try {
     // Validate the request body

@@ -2,14 +2,16 @@
 const admin = require('firebase-admin');
 require('dotenv').config();
 
-let firebaseApp;
+// Singleton pattern to ensure Firebase is only initialized once
+let firebaseApp = null;
 
 try {
-  // Initialize Firebase Admin using environment variables
+  // Check if environment variables are available
   if (process.env.FIREBASE_PROJECT_ID && 
       process.env.FIREBASE_PRIVATE_KEY && 
       process.env.FIREBASE_CLIENT_EMAIL) {
     
+    // Initialize Firebase Admin SDK
     firebaseApp = admin.initializeApp({
       credential: admin.credential.cert({
         projectId: process.env.FIREBASE_PROJECT_ID,

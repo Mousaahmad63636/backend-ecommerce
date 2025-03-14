@@ -15,6 +15,8 @@ const uploadDir = '/backend/uploads/products';
 const admin = require('./firebase-config');
 const sharp = require('sharp'); 
 const { DISK_MOUNT_PATH } = require('./middleware/upload');
+const Order = require('./models/Order');
+const notificationService = require('./services/notificationService');
 if (!fs.existsSync(uploadDir)) {
     fs.mkdirSync(uploadDir, { recursive: true });
 }
