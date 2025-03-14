@@ -1,6 +1,5 @@
 // /opt/render/project/src/services/notificationService.js
 const admin = require('../firebase-config');
-const User = require('../models/User');
 
 const notificationService = {
   /**
@@ -9,14 +8,14 @@ const notificationService = {
    */
   sendNewOrderNotification: async function(order) {
     try {
-      // Check if Firebase messaging is available
-      if (!admin.messaging) {
-        console.error('Firebase messaging is not available - admin object:', admin);
+      // First check if Firebase is properly initialized
+      if (!admin.apps.length) {
+        console.error('Firebase Admin SDK not initialized');
         return;
       }
 
       // Get FCM tokens for all admin users
-      const adminTokens = await User.getAdminFCMTokens();
+      const adminTokens = await require('../models/User').getAdminFCMTokens();
       
       if (!adminTokens || adminTokens.length === 0) {
         console.log('No admin tokens found to notify');
@@ -36,27 +35,37 @@ const notificationService = {
           type: 'new_order',
           title: 'New Order Received',
           message: `Order #${order.orderId || 'N/A'} from ${order.customerName} has been received.`
-        },
-        tokens: adminTokens // Array of tokens
+        }
       };
 
-      // Send the message using the messaging service
-      const messagingService = admin.messaging();
-      console.log('Messaging service initialized:', messagingService);
-      
-      const response = await messagingService.sendMulticast(message);
-      
-      console.log(`Notifications sent: ${response.successCount} successful, ${response.failureCount} failed`);
-      
-      if (response.failureCount > 0) {
-        response.responses.forEach((resp, idx) => {
-          if (!resp.success) {
-            console.log('Failed to send to token:', adminTokens[idx], 'Error:', resp.error);
-          }
+      // Send notifications individually instead of using sendMulticast
+      const sendPromises = adminTokens.map(token => {
+        return admin.messaging().send({
+          ...message,
+          token: token  // Send to individual token
         });
-      }
+      });
+
+      const results = await Promise.allSettled(sendPromises);
       
-      return response;
+      // Count successful and failed notifications
+      const successCount = results.filter(r => r.status === 'fulfilled').length;
+      const failureCount = results.filter(r => r.status === 'rejected').length;
+      
+      console.log(`Notifications sent: ${successCount} successful, ${failureCount} failed`);
+      
+      // Log specific failures
+      results.forEach((result, idx) => {
+        if (result.status === 'rejected') {
+          console.log('Failed to send to token:', adminTokens[idx], 'Error:', result.reason);
+        }
+      });
+      
+      return {
+        successCount,
+        failureCount,
+        results
+      };
     } catch (error) {
       console.error('Error sending new order notification:', error);
       // Don't throw to prevent disrupting the main order flow
@@ -69,14 +78,14 @@ const notificationService = {
    */
   sendOrderStatusNotification: async function(order) {
     try {
-      // Check if Firebase messaging is available
-      if (!admin.messaging) {
-        console.error('Firebase messaging is not available');
+      // First check if Firebase is properly initialized
+      if (!admin.apps.length) {
+        console.error('Firebase Admin SDK not initialized');
         return;
       }
 
       // Get admin tokens
-      const adminTokens = await User.getAdminFCMTokens();
+      const adminTokens = await require('../models/User').getAdminFCMTokens();
       
       if (!adminTokens || adminTokens.length === 0) {
         console.log('No admin tokens found to notify about status update');
@@ -94,17 +103,30 @@ const notificationService = {
           type: 'order_status_update',
           title: 'Order Status Updated',
           message: `Order #${order.orderId || 'N/A'} status changed to ${order.status}.`
-        },
-        tokens: adminTokens
+        }
       };
 
-      // Send the message
-      const messagingService = admin.messaging();
-      const response = await messagingService.sendMulticast(message);
+      // Send notifications individually instead of using sendMulticast
+      const sendPromises = adminTokens.map(token => {
+        return admin.messaging().send({
+          ...message,
+          token: token  // Send to individual token
+        });
+      });
+
+      const results = await Promise.allSettled(sendPromises);
       
-      console.log(`Status notifications sent: ${response.successCount} successful, ${response.failureCount} failed`);
+      // Count successful and failed notifications
+      const successCount = results.filter(r => r.status === 'fulfilled').length;
+      const failureCount = results.filter(r => r.status === 'rejected').length;
       
-      return response;
+      console.log(`Status notifications sent: ${successCount} successful, ${failureCount} failed`);
+      
+      return {
+        successCount,
+        failureCount,
+        results
+      };
     } catch (error) {
       console.error('Error sending status notification:', error);
       // Don't throw to prevent disrupting the main order flow
