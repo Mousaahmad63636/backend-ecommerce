@@ -144,6 +144,33 @@ app.get('/api/preview/:productId', async (req, res) => {
       res.status(500).send('Error generating preview');
     }
   });
+  // Add this to your server.js or a test route file
+app.get('/api/test-notification', async (req, res) => {
+    try {
+      const admin = require('./firebase-config');
+      
+      // Verify Firebase is initialized
+      if (!admin.apps.length) {
+        return res.status(500).json({ error: 'Firebase not initialized' });
+      }
+      
+      // Test if messaging is available
+      const messaging = admin.messaging();
+      if (!messaging) {
+        return res.status(500).json({ error: 'Messaging service not available' });
+      }
+      
+      res.json({ 
+        status: 'success', 
+        message: 'Firebase Admin SDK is properly initialized',
+        hasMessaging: !!messaging,
+        firebaseInitialized: admin.apps.length > 0
+      });
+    } catch (error) {
+      console.error('Test notification error:', error);
+      res.status(500).json({ error: error.message });
+    }
+  });
 // Set up specific routes for different upload directories
 app.use('/uploads/hero', express.static(path.join(DISK_MOUNT_PATH, 'hero')));
 app.use('/uploads/products', express.static(path.join(DISK_MOUNT_PATH, 'products')));
