@@ -98,15 +98,19 @@ app.use('/uploads', cors({
     credentials: false,  // Important for public files
 }));
 
-// Static Files Setup with proper headers for crawlers
+// Add this to the static file setup in server.js
 app.use('/uploads', express.static(DISK_MOUNT_PATH, {
     setHeaders: (res, path) => {
+        // Set strong caching headers for images
+        const maxAge = 31536000; // 1 year in seconds
+
         // Set appropriate headers for all files
         res.set({
             'Cross-Origin-Resource-Policy': 'cross-origin',
             'Access-Control-Allow-Origin': '*',
             'Access-Control-Allow-Methods': 'GET, HEAD, OPTIONS',
-            'Cache-Control': 'public, max-age=31536000'
+            'Cache-Control': `public, max-age=${maxAge}, immutable`,
+            'Expires': new Date(Date.now() + maxAge * 1000).toUTCString()
         });
         
         // Set appropriate image headers for different file types
@@ -121,6 +125,53 @@ app.use('/uploads', express.static(DISK_MOUNT_PATH, {
         }
     }
 }));
+
+// Then add this route before your other routes
+// This will create dynamic resized versions of your product images
+app.get('/uploads/optimized/:size/:filename', async (req, res) => {
+  try {
+    const { size, filename } = req.params;
+    const originalPath = path.join(DISK_MOUNT_PATH, 'products', filename);
+    
+    // Check if the file exists
+    if (!fs.existsSync(originalPath)) {
+      return res.status(404).send('Image not found');
+    }
+    
+    // Define sizes
+    const sizes = {
+      thumbnail: { width: 150, height: 150 },
+      small: { width: 300, height: 300 },
+      medium: { width: 600, height: 600 },
+      large: { width: 1200, height: 1200 }
+    };
+    
+    // Get the requested size or default to medium
+    const dimensions = sizes[size] || sizes.medium;
+    
+    // Process the image with sharp
+    const processedImage = await sharp(originalPath)
+      .resize(dimensions.width, dimensions.height, {
+        fit: 'inside',
+        withoutEnlargement: true
+      })
+      .toFormat('webp', { quality: 80 })
+      .toBuffer();
+    
+    // Set appropriate headers
+    res.set({
+      'Content-Type': 'image/webp',
+      'Cross-Origin-Resource-Policy': 'cross-origin',
+      'Access-Control-Allow-Origin': '*',
+      'Cache-Control': 'public, max-age=31536000'
+    });
+    
+    res.send(processedImage);
+  } catch (error) {
+    console.error('Image processing error:', error);
+    res.status(500).send('Error processing image');
+  }
+});
 app.get('/api/preview/:productId', async (req, res) => {
     try {
       const product = await Product.findById(req.params.productId);
