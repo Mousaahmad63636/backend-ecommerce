@@ -26,6 +26,14 @@ async function getAdminTokens() {
 }
 
 /**
+ * Check if Firebase is properly initialized
+ * @returns {boolean} Whether Firebase is initialized
+ */
+function isFirebaseInitialized() {
+  return admin && admin.apps && admin.apps.length > 0;
+}
+
+/**
  * Send notification when a new order is created
  * @param {Object} order - The newly created order
  * @returns {Promise<void>}
@@ -34,31 +42,21 @@ async function sendNewOrderNotification(order) {
   try {
     console.log('Attempting to send new order notification...');
     
-    // Diagnostic information
-    console.log('Firebase admin status:', {
-      exists: !!admin,
-      hasApps: admin && Array.isArray(admin.apps),
-      appsLength: admin && admin.apps ? admin.apps.length : 0,
-      hasMessagingFunc: admin && typeof admin.messaging === 'function'
-    });
+    // Check if Firebase is initialized
+    if (!isFirebaseInitialized()) {
+      console.error('❌ Cannot send notification: Firebase not initialized');
+      return;
+    }
     
     // Access the messaging service
     let messaging;
     try {
-      if (admin && typeof admin.messaging === 'function') {
-        messaging = admin.messaging();
-        if (!messaging) {
-          console.error('Firebase Admin SDK messaging() returned null');
-          return;
-        }
-        console.log('Firebase messaging service successfully accessed');
-        
-        // Check what methods are available on messaging (for debugging)
-        console.log('Available messaging methods:', Object.keys(messaging));
-      } else {
-        console.error('Firebase Admin SDK messaging function not available');
+      messaging = admin.messaging();
+      if (!messaging) {
+        console.error('Firebase Admin SDK messaging() returned null');
         return;
       }
+      console.log('Firebase messaging service successfully accessed');
     } catch (error) {
       console.error('Error accessing Firebase messaging:', error);
       return;
@@ -140,17 +138,18 @@ async function sendOrderStatusNotification(order) {
   try {
     console.log('Attempting to send status update notification...');
     
+    // Check if Firebase is initialized
+    if (!isFirebaseInitialized()) {
+      console.error('❌ Cannot send status notification: Firebase not initialized');
+      return;
+    }
+    
     // Access the messaging service
     let messaging;
     try {
-      if (admin && typeof admin.messaging === 'function') {
-        messaging = admin.messaging();
-        if (!messaging) {
-          console.error('Firebase Admin SDK messaging() returned null');
-          return;
-        }
-      } else {
-        console.error('Firebase Admin SDK messaging function not available');
+      messaging = admin.messaging();
+      if (!messaging) {
+        console.error('Firebase Admin SDK messaging() returned null');
         return;
       }
     } catch (error) {
@@ -225,5 +224,6 @@ async function sendOrderStatusNotification(order) {
 module.exports = {
   sendNewOrderNotification,
   sendOrderStatusNotification,
-  getAdminTokens
+  getAdminTokens,
+  isFirebaseInitialized
 };
