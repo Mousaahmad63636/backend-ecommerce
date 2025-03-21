@@ -5,9 +5,46 @@ const path = require('path');
 
 console.log('Starting Firebase initialization...');
 
-// Check for Firebase service account details
-let serviceAccount;
-let firebaseInitialized = false;
+function sanitizePrivateKey(key) {
+  // If the key is already in the correct format, return it as is
+  if (key.startsWith('-----BEGIN PRIVATE KEY-----') && key.includes('\n')) {
+    return key;
+  }
+  
+  // Handle the case where newlines are escaped or missing
+  let sanitized = key;
+  
+  // Replace literal \n with actual newlines if they exist
+  if (sanitized.includes('\\n')) {
+    sanitized = sanitized.replace(/\\n/g, '\n');
+  }
+  
+  // Ensure the key has proper PEM format if it doesn't already
+  if (!sanitized.startsWith('-----BEGIN PRIVATE KEY-----')) {
+    sanitized = `-----BEGIN PRIVATE KEY-----\n${sanitized}\n-----END PRIVATE KEY-----\n`;
+  }
+  
+  // If key is base64 encoded without proper headers and newlines, format it correctly
+  if (!sanitized.includes('\n')) {
+    // Extract the base64 content if the headers are already there
+    let base64Content = sanitized;
+    if (sanitized.includes('-----BEGIN PRIVATE KEY-----')) {
+      base64Content = sanitized.replace('-----BEGIN PRIVATE KEY-----', '')
+                              .replace('-----END PRIVATE KEY-----', '')
+                              .trim();
+    }
+    
+    // Format with proper headers and line breaks (65 chars per line is standard)
+    let formattedKey = '-----BEGIN PRIVATE KEY-----\n';
+    for (let i = 0; i < base64Content.length; i += 64) {
+      formattedKey += base64Content.substring(i, i + 64) + '\n';
+    }
+    formattedKey += '-----END PRIVATE KEY-----\n';
+    sanitized = formattedKey;
+  }
+  
+  return sanitized;
+}
 
 try {
   // Method 1: Try getting credentials from environment variables
@@ -17,14 +54,15 @@ try {
     
     console.log('Using Firebase credentials from environment variables');
     
-    // Format private key properly - env vars often escape newlines
-    let privateKey = process.env.FIREBASE_PRIVATE_KEY;
-    if (privateKey.includes('\\n')) {
-      privateKey = privateKey.replace(/\\n/g, '\n');
-      console.log('Reformatted private key newlines');
-    }
+    // Properly sanitize the private key
+    const privateKey = sanitizePrivateKey(process.env.FIREBASE_PRIVATE_KEY);
     
-    serviceAccount = {
+    // Log a sample of the private key format for debugging (be careful not to expose the full key)
+    const keyPreview = privateKey.substring(0, 40) + '...' + 
+                       privateKey.substring(privateKey.length - 20);
+    console.log('Private key format:', keyPreview);
+    
+    const serviceAccount = {
       type: 'service_account',
       project_id: process.env.FIREBASE_PROJECT_ID,
       private_key_id: process.env.FIREBASE_PRIVATE_KEY_ID || '',
@@ -36,55 +74,29 @@ try {
       auth_provider_x509_cert_url: 'https://www.googleapis.com/oauth2/v1/certs',
       client_x509_cert_url: `https://www.googleapis.com/robot/v1/metadata/x509/${encodeURIComponent(process.env.FIREBASE_CLIENT_EMAIL)}`
     };
-  } 
-  // Method 2: Check for service account JSON file
-  else {
-    const serviceAccountPath = process.env.GOOGLE_APPLICATION_CREDENTIALS || 
-                              path.join(__dirname, 'service-account.json');
-    
-    if (fs.existsSync(serviceAccountPath)) {
-      console.log(`Loading Firebase service account from: ${serviceAccountPath}`);
-      serviceAccount = require(serviceAccountPath);
-    } else {
-      console.error('Firebase credentials not found. Missing environment variables or service account file.');
-      console.error('Required: FIREBASE_PROJECT_ID, FIREBASE_CLIENT_EMAIL, FIREBASE_PRIVATE_KEY');
-    }
-  }
-  
-  // Initialize Firebase if we have credentials
-  if (serviceAccount) {
-    // Check if already initialized
+
+    // Initialize Firebase with the credentials
     if (!admin.apps.length) {
       admin.initializeApp({
         credential: admin.credential.cert(serviceAccount)
       });
+      console.log('✅ Firebase Admin SDK initialized with environment variables!');
       
-      // Test if initialization worked
-      if (admin.apps.length > 0) {
-        firebaseInitialized = true;
-        console.log('✅ Firebase Admin SDK initialized successfully!');
-        
-        // Test the messaging service
-        try {
-          const messaging = admin.messaging();
-          console.log('✅ Firebase Messaging service is available');
-        } catch (msgError) {
-          console.error('❌ Firebase Messaging error:', msgError.message);
-        }
-      } else {
-        console.error('❌ Firebase initialization failed - no apps created');
-      }
-    } else {
-      firebaseInitialized = true;
-      console.log('Firebase Admin SDK already initialized');
+      // Test OAuth token generation - this will fail early if credentials are bad
+      admin.app().options.credential.getAccessToken()
+        .then(() => {
+          console.log('✅ Successfully authenticated with Firebase');
+        })
+        .catch(error => {
+          console.error('❌ Firebase authentication error:', error.message);
+        });
     }
+  } else {
+    console.error('Missing required Firebase environment variables');
+    console.error('Required: FIREBASE_PROJECT_ID, FIREBASE_CLIENT_EMAIL, FIREBASE_PRIVATE_KEY');
   }
 } catch (error) {
   console.error('❌ Firebase initialization error:', error);
-}
-
-if (!firebaseInitialized) {
-  console.error('⚠️ WARNING: Firebase is not initialized. Notifications will not work!');
 }
 
 module.exports = admin;

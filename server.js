@@ -383,7 +383,45 @@ if (process.env.NODE_ENV === 'development') {
     const logStream = fs.createWriteStream(logFile, { flags: 'a' });
     app.use(morgan('combined', { stream: logStream }));
 }
-
+app.get('/api/firebase-diagnostic', async (req, res) => {
+  try {
+    const admin = require('./firebase-config');
+    const diagnosticInfo = {
+      initialized: admin && admin.apps && admin.apps.length > 0,
+      appsCount: admin?.apps?.length || 0,
+      projectId: process.env.FIREBASE_PROJECT_ID ? 
+        `${process.env.FIREBASE_PROJECT_ID.substring(0, 5)}...` : 'not set',
+      clientEmail: process.env.FIREBASE_CLIENT_EMAIL ? 
+        `${process.env.FIREBASE_CLIENT_EMAIL.split('@')[0].substring(0, 5)}...@${process.env.FIREBASE_CLIENT_EMAIL.split('@')[1]}` : 'not set',
+      privateKeyFormat: process.env.FIREBASE_PRIVATE_KEY ? 
+        (process.env.FIREBASE_PRIVATE_KEY.includes('-----BEGIN PRIVATE KEY-----') ? 'has PEM headers' : 'missing PEM headers') : 'not set',
+      privateKeyLength: process.env.FIREBASE_PRIVATE_KEY ? 
+        process.env.FIREBASE_PRIVATE_KEY.length : 0,
+      environment: process.env.NODE_ENV || 'development'
+    };
+    
+    // Try to authenticate to test credentials
+    let authStatus = 'not tested';
+    
+    if (diagnosticInfo.initialized) {
+      try {
+        await admin.app().options.credential.getAccessToken();
+        authStatus = 'success';
+      } catch (authError) {
+        authStatus = `failed: ${authError.message}`;
+      }
+    }
+    
+    diagnosticInfo.authenticationStatus = authStatus;
+    
+    res.json(diagnosticInfo);
+  } catch (error) {
+    res.status(500).json({
+      error: error.message,
+      stack: process.env.NODE_ENV === 'development' ? error.stack : undefined
+    });
+  }
+});
 // Root Route
 app.get('/', (req, res) => {
   res.json({
