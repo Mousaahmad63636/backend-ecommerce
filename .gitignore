@@ -1,0 +1,56 @@
+# Dependencies
+/node_modules
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Environment variables
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+
+# Runtime data
+pids
+*.pid
+*.seed
+*.pid.lock
+
+# Logs
+logs
+*.log
+
+# Optional npm cache directory
+.npm
+
+# Optional eslint cache
+.eslintcache
+
+# IDE specific files
+.idea
+.vscode
+*.swp
+*.swo
+# Add these lines to .gitignore
+firebase-service-account.json
+*.json.json
+*-service-account*.json
+# Uploads directory content but keep directory
+/uploads/*
+!/uploads/.gitkeep
+!/uploads/products/.gitkeep
+!/uploads/profile-images/.gitkeep
+!/uploads/hero/.gitkeep
+
+# Database
+*.sqlite
+
+# OS generated files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
