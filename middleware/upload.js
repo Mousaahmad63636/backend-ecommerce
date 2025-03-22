@@ -62,7 +62,7 @@ const productUpload = multer({
     storage: productStorage,
     limits: {
         fileSize: 5 * 1024 * 1024, // 5MB limit
-        files: 5
+        files: 10
     },
     fileFilter: productFileFilter
 });

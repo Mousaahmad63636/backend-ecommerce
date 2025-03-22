@@ -20,7 +20,7 @@ router.get('/', async (req, res) => {
 });
 
 // Add new product with multiple categories
-router.post('/add', productUpload.array('images', 5), async (req, res) => {
+router.post('/add', productUpload.array('images', 10), async (req, res) => {
   try {
     console.log('Adding product with data:', req.body);
     
@@ -254,7 +254,7 @@ router.get('/:id', async (req, res) => {
   }
 });
 
-router.put('/:id', productUpload.array('images', 5), async (req, res) => {
+router.put('/:id', productUpload.array('images', 10), async (req, res) => {
   try {
     console.log('Update request for product ID:', req.params.id);
     console.log('Request body:', req.body);
